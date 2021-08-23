@@ -49,12 +49,13 @@ calcLaggedData <- function(x,nblistw,method="mean"){
 #' @param v A numeric vector of length p
 #' @return A vector of length n giving the euclidean distance between all matrix
 #'   row and the vector p
+#' @importFrom matrixStats colSums2
 #' @keywords internal
 #' @examples
 #' #This is an internal function, no example provided
 calcEuclideanDistance <- function(m, v) {
   v <- as.numeric(v)
-  alldistances <-colSums((t(m)-v)**2)
+  alldistances <- colSums2((t(m)-v)**2)
   return(alldistances)
 }
 
@@ -73,13 +74,14 @@ calcEuclideanDistance <- function(m, v) {
 #' @param tol A float representing the algorithm tolerance
 #' @return A boolean, TRUE if the test is passed, FALSE otherwise
 #' @keywords internal
+#' @importFrom matrixStats rowMaxs
 #' @examples
 #' #This is an internal function, no example provided
 evaluateMatrices <- function(mat1, mat2, tol) {
-  mat1 < -as.matrix(mat1)
+  mat1 <- as.matrix(mat1)
   mat2 <- as.matrix(mat2)
   differ <- abs(mat1 - mat2)
-  diffobs <- apply(differ, 1,max)
+  diffobs <- rowMaxs(differ)
   if (length(diffobs[diffobs >= tol]) > 0) {
     return(FALSE)
   } else{
@@ -88,26 +90,29 @@ evaluateMatrices <- function(mat1, mat2, tol) {
 }
 
 
+
 #' @title kpp centers selection
 #'
-#' @description Select the inital centers of centroids by using the k++ approach
+#' @description Select the initial centers of centroids by using the k++ approach
 #' as suggested in this article: http://ilpubs.stanford.edu:8090/778/1/2006-13.pdf
 #'
 #' @param data The dataset used in the classification
 #' @param k The number of groups for the classification
 #' @return a DataFrame, each row is the center of a cluster
 #' @keywords internal
+#' @importFrom matrixStats rowMins
 #' @examples
 #' #This is an internal function, no example provided
 kppCenters <- function(data,k){
   # step1: select the first center at random
-  centers <- as.matrix(data[sample(1:nrow(data),size = 1),])
+  centers <- t(as.matrix(data[sample(1:nrow(data),size = 1),], nrow = 1))
   # select the other centers
   for (i in 2:k){
     dists <- apply(centers,1,function(ci){
-      return(calcEuclideanDistance(data,ci))
+      return(calcEuclideanDistance2(data,ci))
     })
-    Dx <- apply(dists,1,min)
+    #Dx <- apply(dists,1,min)
+    Dx <- rowMins(dists)
     probs <- (Dx**2) / sum((Dx**2))
     new_center <- data[sample(1:nrow(data),size = 1,prob = probs),]
     centers <- rbind(centers,new_center)
@@ -153,18 +158,46 @@ main_worker <- function(algo, ...){
   if(algo == "FCM"){
     update_belongs <- belongsFCM
     udpdate_centers <- centersFCM
+    params <- list(
+      k = k,
+      m = dots$m,
+      algo = "FCM"
+    )
 
   }else if(algo=="GFCM"){
     update_belongs <- belongsGFCM
     udpdate_centers <- centersGFCM
+    params <- list(
+      k = k,
+      m = dots$m,
+      beta = dots$beta,
+      algo = "GFCM"
+    )
 
   }else if (algo=="SFCM"){
     update_belongs <- belongsSFCM
     udpdate_centers <- centersSFCM
+    params <- list(
+      k = k,
+      m = dots$m,
+      alpha = dots$alpha,
+      nblistw = dots$nblistw,
+      lag_method = dots$lag_method,
+      algo = "SFCM"
+    )
 
   }else if (algo=="SGFCM"){
     update_belongs <- belongsSGFCM
     udpdate_centers <- centersSGFCM
+    params <- list(
+      k = k,
+      m = dots$m,
+      alpha = dots$alpha,
+      nblistw = dots$nblistw,
+      beta = dots$beta,
+      lag_method = dots$lag_method,
+      algo = "SGFCM"
+    )
   }
 
   # selecting the original centers from observations
@@ -212,8 +245,16 @@ main_worker <- function(algo, ...){
   }
   DF <- as.data.frame(newbelongmatrix)
   Groups <- colnames(DF)[max.col(DF, ties.method = "first")]
-  return(list(Centers = centers, Belongings = newbelongmatrix,
-              Groups = Groups, Data = data))
+
+  results <- c(list(Centers = centers, Belongings = newbelongmatrix,
+                  Groups = Groups, Data = data,
+                  maxiter = maxiter, tol = tol,
+                  isRaster = FALSE),params)
+
+  ## setting the class of the results
+  results <- FCMres(results)
+
+  return(results)
 
 }
 
@@ -252,7 +293,7 @@ sanity_check <- function(dots,data){
   }
 
   if(dots$k < 2){
-    stop("k must be at leat 2")
+    stop("k must be at least 2")
   }
 
   if(is.null(dots$seed) == FALSE){
@@ -284,33 +325,82 @@ sanity_check <- function(dots,data){
 # This set of function is used to provide the parameters in the right order
 # to the intermediate functions
 
+#' @title membership matrix calculator for FCM algorithm
+#' @param data a matrix (the dataset used for clustering)
+#' @param centers a matrix (the centers of the clusters)
+#' @param dots a list of other arguments specific to FCM
+#' @return a matrix with the new membership values
+#' @keywords internal
 belongsFCM <- function(data, centers ,dots){
   return(calcBelongMatrix(centers,data,dots$m))
 }
+#' @title center matrix calculator for FCM algorithm
+#' @param data a matrix (the dataset used for clustering)
+#' @param centers a matrix (the centers of the clusters)
+#' @param belongmatrix a matrix with the membership values
+#' @param dots a list of other arguments specific to FCM
+#' @return a matrix with the new centers
+#' @keywords internal
 centersFCM <- function(data, centers, belongmatrix, dots){
   return(calcCentroids(data,belongmatrix, dots$m))
 }
 
-
+#' @title membership matrix calculator for GFCM algorithm
+#' @param data a matrix (the dataset used for clustering)
+#' @param centers a matrix (the centers of the clusters)
+#' @param dots a list of other arguments specific to FCM
+#' @return a matrix with the new membership values
+#' @keywords internal
 belongsGFCM <- function(data,centers,dots){
   return(calcFGCMBelongMatrix(centers,data,dots$m,dots$beta))
 }
+#' @title center matrix calculator for GFCM algorithm
+#' @param data a matrix (the dataset used for clustering)
+#' @param centers a matrix (the centers of the clusters)
+#' @param belongmatrix a matrix with the membership values
+#' @param dots a list of other arguments specific to FCM
+#' @return a matrix with the new centers
+#' @keywords internal
 centersGFCM <- function(data, centers, belongmatrix, dots){
   return(calcCentroids(data,belongmatrix, dots$m))
 }
 
-
+#' @title membership matrix calculator for SFCM algorithm
+#' @param data a matrix (the dataset used for clustering)
+#' @param centers a matrix (the centers of the clusters)
+#' @param dots a list of other arguments specific to FCM
+#' @return a matrix with the new membership values
+#' @keywords internal
 belongsSFCM <- function(data,centers,dots){
   return(calcSFCMBelongMatrix(centers,data,dots$wdata,dots$m,dots$alpha))
 }
+#' @title center matrix calculator for SFCM algorithm
+#' @param data a matrix (the dataset used for clustering)
+#' @param centers a matrix (the centers of the clusters)
+#' @param belongmatrix a matrix with the membership values
+#' @param dots a list of other arguments specific to FCM
+#' @return a matrix with the new centers
+#' @keywords internal
 centersSFCM <- function(data, centers, belongmatrix, dots){
   return(calcSWFCCentroids(data,dots$wdata,belongmatrix,dots$m,dots$alpha))
 }
 
-
+#' @title membership matrix calculator for SGFCM algorithm
+#' @param data a matrix (the dataset used for clustering)
+#' @param centers a matrix (the centers of the clusters)
+#' @param dots a list of other arguments specific to FCM
+#' @return a matrix with the new membership values
+#' @keywords internal
 belongsSGFCM <- function(data,centers,dots){
   return(calcSFGCMBelongMatrix(centers,data,dots$wdata,dots$m,dots$alpha,dots$beta))
 }
+#' @title center matrix calculator for SGFCM algorithm
+#' @param data a matrix (the dataset used for clustering)
+#' @param centers a matrix (the centers of the clusters)
+#' @param belongmatrix a matrix with the membership values
+#' @param dots a list of other arguments specific to FCM
+#' @return a matrix with the new centers
+#' @keywords internal
 centersSGFCM <- function(data, centers, belongmatrix, dots){
   return(calcSWFCCentroids(data,dots$wdata,belongmatrix,dots$m,dots$alpha))
 }

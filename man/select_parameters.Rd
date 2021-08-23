@@ -14,12 +14,16 @@ select_parameters(
   beta = NA,
   nblistw = NULL,
   lag_method = "mean",
+  window = NULL,
   spconsist = TRUE,
   classidx = TRUE,
+  nrep = 30,
+  indices = NULL,
   standardize = TRUE,
   maxiter = 500,
   tol = 0.01,
   seed = NULL,
+  init = "random",
   verbose = TRUE
 )
 
@@ -32,19 +36,23 @@ selectParameters(
   beta = NA,
   nblistw = NULL,
   lag_method = "mean",
+  window = NULL,
   spconsist = TRUE,
   classidx = TRUE,
+  nrep = 30,
+  indices = NULL,
   standardize = TRUE,
   maxiter = 500,
   tol = 0.01,
   seed = NULL,
+  init = "random",
   verbose = TRUE
 )
 }
 \arguments{
 \item{algo}{A string indicating which method to use (FCM, GFCM, SFCM, SGFCM)}
 
-\item{data}{A dataframe with numeric columns}
+\item{data}{A dataframe with numeric columns or a list of rasters.}
 
 \item{k}{A sequence of values for k to test (>=2)}
 
@@ -59,13 +67,29 @@ produced by the spdep package (NULL if not required)}
 
 \item{lag_method}{A string indicating if a classical lag must be used
 ("mean") or if a weighted median must be used ("median"). Both can be
-tested by specifying a vector : c("mean","median")}
+tested by specifying a vector : c("mean","median"). When working with rasters,
+the string must be parsable to a function like mean, min, max, sum, etc. and will
+be applied to all the pixels values in the window designated by the parameter window
+and weighted according to the values of this matrix.}
+
+\item{window}{A list of windows to use to calculate neighbouring values if
+rasters are used.}
 
 \item{spconsist}{A boolean indicating if the spatial consistency must be
 calculated}
 
 \item{classidx}{A boolean indicating if the quality of classification
 indices must be calculated}
+
+\item{nrep}{An integer indicating the number of permutation to do to simulate
+the random distribution of the spatial inconsistency. Only used if spconsist
+is TRUE.}
+
+\item{indices}{A character vector with the names of the indices to calculate, to
+evaluate clustering quality. default is :c("Silhouette.index", "Partition.entropy",
+"Partition.coeff", "XieBeni.index", "FukuyamaSugeno.index", "Explained.inertia").
+Other available indices are : "DaviesBoulin.index", "CalinskiHarabasz.index",
+"GD43.index", "GD53.index" and "Negentropy.index".}
 
 \item{standardize}{A boolean to specify if the variable must be centered and
 reduce (default = True)}
@@ -77,6 +101,10 @@ convergence assessment}
 
 \item{seed}{An integer used for random number generation. It ensures that the
 start centers will be the same if the same integer is selected.}
+
+\item{init}{A string indicating how the initial centers must be selected. "random"
+indicates that random observations are used as centers. "kpp" use a distance based method
+resulting in more dispersed centers at the beginning. Both of them are heuristic.}
 
 \item{verbose}{A boolean indicating if a progressbar should be displayed}
 }

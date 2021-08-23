@@ -12,28 +12,28 @@ library(spdep)
 
 data(LyonIris)
 
-#selecting the columns for the analysis
+# selecting the columns for the analysis
 AnalysisFields <-c("Lden","NO2","PM25","VegHautPrt","Pct0_14",
                    "Pct_65","Pct_Img","TxChom1564","Pct_brevet","NivVieMed")
 
-#rescaling the columns
+# rescaling the columns
 Data <- LyonIris@data[AnalysisFields]
 for (Col in names(Data)){
   Data[[Col]] <- scale(Data[[Col]])
 }
 
-#preparing some elements for further mapping
+# preparing some elements for further mapping
 LyonIris$OID <- as.character(1:nrow(LyonIris))
-FortiData <- broom::tidy(LyonIris,region="OID")
+FortiData <- ggplot2::fortify(LyonIris,region="OID")
 
 ## ----include=FALSE------------------------------------------------------------
-#loading the pre-calculated results
+# loading the pre-calculated results
 load(system.file("extdata", "results_vignette_intro.rda",
                            package = "geocmeans", mustWork = TRUE))
 
 ## ----warning=FALSE, fig.cap = "Impact of the number of groups on the explained variance", out.width = "50%", fig.pos="H", fig.align="center"----
-#finding the best k by using the r2 of the classification
-#trying for k from 2 to 10
+# finding the best k by using the r2 of the classification
+# trying for k from 2 to 10
 R2s <- sapply(2:10,function(k){
   Clust <- kmeans(Data,centers=k,iter.max = 150)
   R2 <- Clust$betweenss / Clust$totss
@@ -53,7 +53,7 @@ ggplot(Df)+
 KMeanClust <-  kmeans(Data,centers=4,iter.max = 150)
 LyonIris$Cluster <-paste("cluster",KMeanClust$cluster,sep="_")
 
-#mapping the groups
+# mapping the groups
 DFmapping <- merge(FortiData,LyonIris,by.x="id",by.y="OID")
 
 ggplot(data=DFmapping)+
@@ -193,9 +193,9 @@ SGFCM <- SGFCMeans(Data,WMat,k = 4,m=1.5, alpha=0.95, beta = 0.65,
 r1 <- calcqualityIndexes(Data, SFCM$Belongings,m = 1.5)
 r2 <- calcqualityIndexes(Data, SGFCM$Belongings,m = 1.5)
 
-diagSFCM <- spatialDiag(belongmatrix = SFCM$Belongings, nblistw = WMat,
+diagSFCM <- spatialDiag(SFCM$Belongings, nblistw = WMat,
                         undecided = 0.45,nrep = 500)
-diagSGFCM <- spatialDiag(belongmatrix = SGFCM$Belongings, nblistw = WMat,
+diagSGFCM <- spatialDiag(SGFCM$Belongings, nblistw = WMat,
                          undecided = 0.45,nrep = 500)
 
 df <- cbind(
@@ -207,8 +207,8 @@ row.names(df)[length(row.names(df))] <- "sp.consistency"
 knitr::kable(df,digits = 3,col.names = c("SFCM","SGFCM"))
 
 ## ----warning=FALSE, fig.cap = "Probability of belonging to cluster 1", out.width="80%", fig.pos="H", fig.align="center"----
-SFCMMaps <- mapClusters(geodata = LyonIris,belongmatrix = SFCM$Belongings,undecided = 0.45)
-SGFCMMaps <- mapClusters(geodata = LyonIris,belongmatrix = SGFCM$Belongings,undecided = 0.45)
+SFCMMaps <- mapClusters(geodata = LyonIris, object = SFCM$Belongings,undecided = 0.45)
+SGFCMMaps <- mapClusters(geodata = LyonIris, object = SGFCM$Belongings,undecided = 0.45)
 
 ggarrange(SFCMMaps$ProbaMaps[[1]],SGFCMMaps$ProbaMaps[[1]], nrow = 1, ncol = 2,
           common.legend = TRUE, legend = "bottom")
@@ -230,10 +230,10 @@ ggarrange(SFCMMaps$ClusterPlot,SGFCMMaps$ClusterPlot, nrow = 1, ncol = 2,
           common.legend = TRUE, legend = "bottom")
 
 ## ----warning=FALSE------------------------------------------------------------
-spdiag_1 <- spatialDiag(Cmean$Belongings, nblistw = WMat,nrep=250)
-spdiag_2 <- spatialDiag(GCmean$Belongings, nblistw = WMat,nrep=250)
-spdiag_3 <- spatialDiag(SFCM$Belongings, nblistw = WMat,nrep=250)
-spdiag_4 <- spatialDiag(SGFCM$Belongings, nblistw = WMat,nrep=250)
+spdiag_1 <- spatialDiag(Cmean$Belongings, nblistw = WMat, nrep=250)
+spdiag_2 <- spatialDiag(GCmean$Belongings, nblistw = WMat, nrep=250)
+spdiag_3 <- spatialDiag(SFCM$Belongings, nblistw = WMat, nrep=250)
+spdiag_4 <- spatialDiag(SGFCM$Belongings, nblistw = WMat, nrep=250)
 
 #looking at the moran I values for each group
 moran_table <- data.frame(cbind(spdiag_1$MoranValues$MoranI,
@@ -258,7 +258,7 @@ Undecided <- undecidedUnits(SGFCM$Belongings,0.45)
 LyonIris$FinalCluster <- ifelse(Undecided=="Undecided",
                                 "Undecided",paste("cluster",Undecided,sep="_"))
 
-#mapping the groups
+# mapping the groups
 DFmapping <- merge(FortiData,LyonIris,by.x="id",by.y="OID")
 
 ggplot(data=DFmapping)+
@@ -276,11 +276,68 @@ ggplot(data=DFmapping)+
     )
 
 ## ----warning=FALSE------------------------------------------------------------
+colors <- c("palegreen3","firebrick","lightyellow2","steelblue","pink")
+uncertaintyMap(LyonIris, SGFCM$Belongings, color = colors)
+
+## ----warning=FALSE------------------------------------------------------------
+LyonIris$entropyidx  <- calcUncertaintyIndex(SGFCM$Belongings)
+
+# mapping the uncertainty
+DFmapping <- merge(FortiData,LyonIris,by.x="id",by.y="OID")
+
+ggplot(data=DFmapping)+
+  geom_polygon(aes(x=long,y=lat,group=group,fill=entropyidx),color=rgb(0,0,0,0))+
+  coord_fixed(ratio = 1)+
+  labs(title = "Uncertainty evaluation", fill = "entropy index") +
+  theme(axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank()
+    )
+
+## ----warning=FALSE------------------------------------------------------------
 summarizeClusters(LyonIris@data[AnalysisFields],belongmatrix = SGFCM$Belongings,
                   weighted = TRUE, dec = 3)
+# equivalent to : 
+# summary(SGFCM, LyonIris@data[AnalysisFields])
 
 ## ----warning=FALSE, eval = FALSE----------------------------------------------
 #  spiderPlots(LyonIris@data[AnalysisFields], SGFCM$Belongings,
 #              chartcolors = c("darkorange3","grey4","darkgreen","royalblue"))
 #  violinPlots(LyonIris@data[AnalysisFields], SGFCM$Groups)
+
+## ----warning=FALSE, eval = FALSE----------------------------------------------
+#  bootvalues <- boot_group_validation(SGFCM, nsim = 1000, maxiter = 1000,
+#                                       tol = 0.0001, verbose = FALSE)
+
+## ----warning=FALSE------------------------------------------------------------
+melted_df <- reshape2::melt(bootvalues$group_consistency)
+melted_df$variable <- as.factor(melted_df$variable)
+
+ggplot() +
+  geom_histogram(mapping = aes(x = value), data = melted_df, bins = 30) +
+  labs(title = "stability of clusters", subtitle = "for 1000 iterations",
+       x = "Jaccard index") +
+  facet_wrap(vars(variable), ncol=2)
+
+## ----warning=FALSE------------------------------------------------------------
+df_gp3 <- bootvalues$group_centers[["group3"]]
+
+melted_df <- reshape2::melt(df_gp3)
+melted_df$variable <- as.factor(melted_df$variable)
+
+ggplot() +
+  geom_histogram(mapping = aes(x = value), data = melted_df, bins = 30) +
+  labs(title = "stability of group 3 centers", subtitle = "for 1000 iterations") +
+  xlim(-3,3)+
+  facet_wrap(vars(variable), ncol=3)
+
+## ----warning=FALSE, eval = FALSE----------------------------------------------
+#  # create the modified weight matrix
+#  WMat_adj <- adjustSpatialWeights(Data, WMat$neighbours, style = "W")
+#  
+#  # calculate the modified version of FCM with non-local information
+#  nl_SFCM <- SFCMeans(Data, WMat_adj, k = 4, m = 1.5, alpha = 0.7,
+#                   tol = 0.0001, standardize = FALSE,
+#                   verbose = FALSE, seed = 456)
+#  
 

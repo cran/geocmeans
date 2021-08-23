@@ -1,296 +1,3 @@
-
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-##### Diagnostic functions #####
-# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-#' @title Fukuyama and Sugeno index
-#'
-#' @description Calculate Fukuyama and Sugeno index of clustering quality
-#'
-#' @param data The original dataframe used for the clustering (n*p)
-#' @param belongmatrix A membership matrix (n*k)
-#' @param centers The centers of the clusters
-#' @param m The fuzzyness parameter
-#' @return A float : the Fukuyama and Sugeno index
-#' @export
-#' @examples
-#' data(LyonIris)
-#' AnalysisFields <-c("Lden","NO2","PM25","VegHautPrt","Pct0_14","Pct_65","Pct_Img",
-#' "TxChom1564","Pct_brevet","NivVieMed")
-#' dataset <- LyonIris@data[AnalysisFields]
-#' queen <- spdep::poly2nb(LyonIris,queen=TRUE)
-#' Wqueen <- spdep::nb2listw(queen,style="W")
-#' result <- SFCMeans(dataset, Wqueen,k = 5, m = 1.5, alpha = 1.5, standardize = TRUE)
-#' calcFukuyamaSugeno(result$Data,result$Belongings, result$Centers, 1.5)
-calcFukuyamaSugeno <- function(data,belongmatrix,centers,m){
-    v_hat <- apply(centers,2,mean)
-    um <- (belongmatrix)**m
-    values <- sapply(1:ncol(belongmatrix),function(i){
-        w <- um[,i]
-        v <- centers[i,]
-        t1 <- calcEuclideanDistance(data,v)
-        t2 <- sum((v - v_hat)**2)
-        #t3 <- calcEuclideanDistance(wdata,v) ajouter l'espace dans l'indice ?
-        #dists <- ((t1+alpha*t3)/(1+alpha) - t2)*w
-        dists <- (t1 - t2)*w
-        return(sum(dists))
-    })
-    return(sum(values))
-}
-
-
-
-#' @title Explained inertia index
-#'
-#' @description Calculate the explained inertia by a classification
-#'
-#' @param data The original dataframe used for the classification (n*p)
-#' @param belongmatrix A membership matrix (n*k)
-#' @return A float : the percentage of the total inertia explained
-#' @export
-#' @examples
-#' data(LyonIris)
-#' AnalysisFields <-c("Lden","NO2","PM25","VegHautPrt","Pct0_14","Pct_65","Pct_Img",
-#' "TxChom1564","Pct_brevet","NivVieMed")
-#' dataset <- LyonIris@data[AnalysisFields]
-#' queen <- spdep::poly2nb(LyonIris,queen=TRUE)
-#' Wqueen <- spdep::nb2listw(queen,style="W")
-#' result <- SFCMeans(dataset, Wqueen,k = 5, m = 1.5, alpha = 1.5, standardize = TRUE)
-#' calcexplainedInertia(result$Data,result$Belongings)
-calcexplainedInertia <- function(data,belongmatrix){
-    #step1 : calculating the centers
-    centers <- t(apply(belongmatrix, MARGIN=2,function(column){
-        values <- apply(data,MARGIN=2,function(var){
-            return(weighted.mean(var,column))
-        })
-        return(values)
-    }))
-    means <- apply(data, 2, mean)
-    baseinertia <- sum(calcEuclideanDistance(data, means))
-    restinertia <- sapply(1:nrow(centers), function(i) {
-        point <- centers[i, ]
-        dists <- calcEuclideanDistance(data, point) * belongmatrix[, i]
-        return(sum(dists))
-    })
-    explainedinertia <- 1 - (sum(restinertia) / baseinertia)
-    return(explainedinertia)
-}
-
-
-#' @title Quality indexes
-#'
-#' @description calculate several clustering quality indexes (most of them come from fclust
-#' package)
-#'
-#' @param data The original dataframe used for the classification (n*p)
-#' @param belongmatrix A membership matrix (n*k)
-#' @param m The fuzziness parameter used for the classification
-#' @return A named list with
-#' \itemize{
-#'         \item Silhouette.index: the silhouette index (fclust::SIL.F)
-#'         \item Partition.entropy: the partition entropy index (fclust::PE)
-#'         \item Partition.coeff: the partition entropy coefficient (fclust::PC)
-#'         \item Modified.partition.coeff: the modified partition entropy coefficient (fclust::MPC)
-#'         \item XieBeni.index : the Xie and Beni index (fclust::XB)
-#'         \item FukuyamaSugeno.index : the Fukuyama and Sugeno index (geocmeans::calcFukuyamaSugeno)
-#'         \item Explained.inertia: the percentage of total inertia explained by the solution
-#'}
-#' @export
-#' @examples
-#' data(LyonIris)
-#' AnalysisFields <-c("Lden","NO2","PM25","VegHautPrt","Pct0_14","Pct_65","Pct_Img",
-#' "TxChom1564","Pct_brevet","NivVieMed")
-#' dataset <- LyonIris@data[AnalysisFields]
-#' queen <- spdep::poly2nb(LyonIris,queen=TRUE)
-#' Wqueen <- spdep::nb2listw(queen,style="W")
-#' result <- SFCMeans(dataset, Wqueen,k = 5, m = 1.5, alpha = 1.5, standardize = TRUE)
-#' calcqualityIndexes(result$Data,result$Belongings, m=1.5)
-calcqualityIndexes <- function(data, belongmatrix, m) {
-
-    centers <- t(apply(belongmatrix, MARGIN=2,function(column){
-        values <- apply(data,MARGIN=2,function(var){
-            return(weighted.mean(var,column))
-        })
-        return(values)
-    }))
-
-    idxsf <- fclust::SIL.F(data, belongmatrix, alpha=1)  #look for maximum
-    idxpe <- fclust::PE(belongmatrix)  #look for minimum
-    idxpc <- fclust::PC(belongmatrix)  #loook for maximum
-    idxmpc <- fclust::MPC(belongmatrix)  #look for maximum
-    idxfukusu <- calcFukuyamaSugeno(data, belongmatrix, centers, m) # look for minimum
-    if(m>1){
-        idxXB <- fclust::XB(data,belongmatrix,centers,m) # look for minimum
-    }else{
-        idxXB <- NA
-    }
-
-    # calculating the explained inertia
-    explainedinertia <- calcexplainedInertia(data,belongmatrix)
-
-    return(list(Silhouette.index = idxsf, Partition.entropy = idxpe,
-                Partition.coeff = idxpc, Modified.partition.coeff = idxmpc,
-                XieBeni.index = idxXB, FukuyamaSugeno.index = idxfukusu,
-                Explained.inertia = explainedinertia))
-}
-
-
-#' @title Spatial diagnostic
-#'
-#' @description Utility function to facilitate the spatial diagnostic of a classification
-#'
-#' Calculate the following indicators : Moran I index (spdep::moranI) for each
-#' column of the belonging matrix, Join count test (spdep::joincount.multi) for
-#' the most likely groups of each datapoint, Spatial consistency index (see
-#' function spConsistency)
-#'
-#' @param belongmatrix A membership matrix
-#' @param nblistw A list.w  object describing the neighbours (spdep package)
-#' @param undecided A float between 0 and 1 giving the minimum value that an
-#'   observation must get in the membership matrix to not be considered as
-#'   uncertain (default = NULL)
-#' @param nrep An integer indicating the number of permutation to do to simulate
-#'   the random distribution of the spatial inconsistency
-#' @return A named list with :
-#' \itemize{
-#'         \item MoranValues : the moran I values fo each column of the membership
-#'          matrix (spdep::MoranI)
-#'         \item JoinCounts : the result of the join count test calculated with
-#'          the most likely group for each datapoint (spdep::joincount.multi)
-#'         \item SpConsist : the mean value of the spatial consistency index
-#'         (the lower, the better, see ?spConsistency for details)
-#'}
-#' @export
-#' @examples
-#' data(LyonIris)
-#' AnalysisFields <-c("Lden","NO2","PM25","VegHautPrt","Pct0_14","Pct_65","Pct_Img",
-#' "TxChom1564","Pct_brevet","NivVieMed")
-#' dataset <- LyonIris@data[AnalysisFields]
-#' queen <- spdep::poly2nb(LyonIris,queen=TRUE)
-#' Wqueen <- spdep::nb2listw(queen,style="W")
-#' result <- SFCMeans(dataset, Wqueen,k = 5, m = 1.5, alpha = 1.5, standardize = TRUE)
-#' spatialDiag(result$Belongings, Wqueen, undecided=0.45, nrep=30)
-spatialDiag <- function(belongmatrix, nblistw, undecided = NULL, nrep = 50) {
-    # calcul de la coherence spatiale
-    Consist <- spConsistency(belongmatrix, nblistw = nblistw, nrep = nrep)
-    belongmatrix <- as.data.frame(belongmatrix)
-    # calcul des I de Moran pour les appartenances
-    Values <- sapply(1:ncol(belongmatrix), function(i) {
-        x <- belongmatrix[, i]
-        morantest <- spdep::moran.mc(x, nblistw, nsim = 999)
-        return(list(MoranI = morantest$statistic, pvalue = morantest$p.value,
-                    Cluster = paste("Cluster_", i, sep = "")))
-    })
-    morandf <- as.data.frame(t(Values))
-    for(col in colnames(morandf)){
-        morandf[[col]] <- unlist(morandf[[col]])
-    }
-    # attribution des groupes
-    groups <- colnames(belongmatrix)[max.col(belongmatrix, ties.method = "first")]
-    if (is.null(undecided) == FALSE) {
-        Maximums <- do.call(pmax, belongmatrix)
-        groups[Maximums < undecided] <- "undecided"
-    }
-    groups <- as.factor(groups)
-    # calcul des join count test
-    spjctetst <- spdep::joincount.multi(groups, nblistw, zero.policy = TRUE)
-    return(list(MoranValues = morandf, JoinCounts = spjctetst, SpConsist = Consist$Mean, SpConsistSamples = Consist$samples))
-}
-
-
-#' @title Spatial consistency index
-#'
-#' @description Calculate a spatial consistency index
-#'
-#' @details This index is experimental, it aims to measure how much a clustering solution
-#' is spatially consistent. A classification is spatially inconsistent if
-#' neighbouring observation do not belong to the same group. See detail for
-#' a description of its calculation
-#'
-#' The total spatial inconsistency (*Scr*) is calculated as follow
-#'
-#' \deqn{isp = \sum_{i}\sum_{j}\sum_{k} (u_{ik} - u_{jk})^{2} * W_{ij}}
-#'
-#' With U the membership matrix, i an observation, k the neighbours of i and W
-#' the spatial weight matrix This represents the total spatial inconsistency of
-#' the solution (true inconsistency) We propose to compare this total with
-#' simulated values obtained by permutations (simulated inconsistency). The
-#' values obtained by permutation are an approximation of the spatial
-#' inconsistency obtained in a random context Ratios between the true
-#' inconsistency and simulated inconsistencies are calculated A value of 0
-#' depict a situation where all observations are identical to their neighbours
-#' A value of 1 depict a situation where all observations are as much different
-#' as their neighbours that what randomness can produce A classification
-#' solution able to reduce this index has a better spatial consistency
-#'
-#' @param belongmatrix A membership matrix
-#' @param nblistw A list.w object describing the neighbours (spdep package)
-#'   observation must get in the membership matrix to not be considered as
-#'   uncertain (default = NULL)
-#' @param nrep An integer indicating the number of permutation to do to simulate
-#' @return A named list with
-#'  \itemize{
-#'         \item Mean : the mean of the spatial consistency index
-#'         \item prt05 : the 5th percentile of the spatial consistency index
-#'         \item prt95 : the 95th percentule of the spatial consistency index
-#'         \item samples : all the value of the spatial consistency index
-#' }
-#' @export
-#' @examples
-#' data(LyonIris)
-#' AnalysisFields <-c("Lden","NO2","PM25","VegHautPrt","Pct0_14","Pct_65","Pct_Img",
-#' "TxChom1564","Pct_brevet","NivVieMed")
-#' dataset <- LyonIris@data[AnalysisFields]
-#' queen <- spdep::poly2nb(LyonIris,queen=TRUE)
-#' Wqueen <- spdep::nb2listw(queen,style="W")
-#' result <- SFCMeans(dataset, Wqueen,k = 5, m = 1.5, alpha = 1.5, standardize = TRUE)
-#' spConsistency(result$Belongings, Wqueen, nrep=50)
-spConsistency <- function(belongmatrix, nblistw, nrep = 999) {
-    belongmat <- as.matrix(belongmatrix)
-    weights <- nblistw$weights
-    neighbours <- nblistw$neighbours
-    ## calcul de l'inconsistence spatiale actuelle
-    obsdev <- sapply(1:nrow(belongmat), function(i) {
-        row <- belongmat[i, ]
-        idneighbour <- neighbours[[i]]
-        neighbour <- belongmat[idneighbour, ]
-        if (length(idneighbour) == 1){
-            neighbour <- t(as.matrix(neighbour))
-        }
-        W <- weights[[i]]
-        diff <- (neighbour-row[col(neighbour)])**2
-        tot <- sum(rowSums(diff) * W)
-        return(tot)
-    })
-
-    totalcons <- sum(obsdev)
-
-    ## simulation de l'inconsistance spatiale
-    belongmat <- t(belongmat)
-    n <- ncol(belongmat)
-    simulated <- vapply(1:nrep, function(d) {
-        belong2 <- belongmat[,sample(n)]
-        simvalues <- vapply(1:ncol(belong2), function(i) {
-            row <- belong2[,i]
-            idneighbour <- neighbours[[i]]
-            neighbour <- belong2[,neighbours[[i]]]
-            if (length(idneighbour) == 1){
-                neighbour <- t(as.matrix(neighbour))
-            }
-            W <- weights[[i]]
-            diff <- (neighbour-row)
-            tot <- sum(diff^2 * W)
-            return(tot)
-        }, FUN.VALUE = 1)
-        return(sum(simvalues))
-    },FUN.VALUE = 1)
-    ratio <- totalcons / simulated
-    return(list(Mean = mean(ratio), Median = quantile(ratio, probs = c(0.5)),
-                prt05 = quantile(ratio, probs = c(0.05)),
-                prt95 = quantile(ratio, probs = c(0.95)),
-                samples = ratio))
-}
-
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ##### Fonctions de visualisation #####
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -299,10 +6,12 @@ spConsistency <- function(belongmatrix, nblistw, nrep = 999) {
 #'
 #' @description Build some maps to visualize the results of the clustering
 #'
-#' @param geodata A object of class spatialpolygonesdataframe /
+#' @param geodata An object of class spatialpolygonesdataframe /
 #' spatiallinesdataframe or spatialpointsdataframe ordered
-#' like the original data used for the clustering
-#' @param belongmatrix The membership matrix obtained at the end of the algorithm
+#' like the original data used for the clustering. Can be Null if object is
+#' a FCMres and has been created with rasters.
+#' @param object  A FCMres object, typically obtained from functions CMeans,
+#'   GCMeans, SFCMeans, SGFCMeans. Can also be a simple membership matrix.
 #' @param undecided A float between 0 and 1 giving the minimum value that an
 #'   observation must get in the membership matrix to not be considered as
 #'   uncertain (default = NULL)
@@ -315,6 +24,7 @@ spConsistency <- function(belongmatrix, nblistw, nrep = 999) {
 #' }
 #' @export
 #' @examples
+#' \dontrun{
 #' data(LyonIris)
 #' AnalysisFields <-c("Lden","NO2","PM25","VegHautPrt","Pct0_14","Pct_65","Pct_Img",
 #' "TxChom1564","Pct_brevet","NivVieMed")
@@ -323,18 +33,113 @@ spConsistency <- function(belongmatrix, nblistw, nrep = 999) {
 #' Wqueen <- spdep::nb2listw(queen,style="W")
 #' result <- SFCMeans(dataset, Wqueen,k = 5, m = 1.5, alpha = 1.5, standardize = TRUE)
 #' MyMaps <- mapClusters(LyonIris, result$Belongings)
-mapClusters <- function(geodata, belongmatrix, undecided = NULL) {
-    if(class(geodata)[[1]]=="SpatialPolygonsDataFrame"){
-        return(mapPolygons(geodata, belongmatrix, undecided))
-    }else if(class(geodata)[[1]]=="SpatialPointsDataFrame"){
-        return(mapPoints(geodata, belongmatrix, undecided))
-    }else if(class(geodata)[[1]]=="SpatialLinesDataFrame"){
-        return(mapLines(geodata, belongmatrix, undecided))
-    }else {
-        stop("The object passed in geodata argument is not supported.
+#' }
+mapClusters <- function(geodata = NULL, object, undecided = NULL) {
+
+    cls <- class(object)[[1]]
+    isRaster <- FALSE
+    if(cls == "FCMres"){
+        belongmatrix <- object$Belongings
+        isRaster <- object$isRaster
+    }else if(class(object)[[1]] == "matrix"){
+        belongmatrix <- object
+    }else{
+        stop("object must be one of matrix of FCMres")
+    }
+
+    if(isRaster){
+        return(mapRasters(object, undecided))
+    }else{
+        geodata$OID <- as.character(1:nrow(geodata@data))
+        if(class(geodata)[[1]]=="SpatialPolygonsDataFrame"){
+            return(mapPolygons(geodata, belongmatrix, undecided))
+        }else if(class(geodata)[[1]]=="SpatialPointsDataFrame"){
+            return(mapPoints(geodata, belongmatrix, undecided))
+        }else if(class(geodata)[[1]]=="SpatialLinesDataFrame"){
+            return(mapLines(geodata, belongmatrix, undecided))
+        }else {
+            stop("The object passed in geodata argument is not supported.
               Supported classes are : SpatialPolygonsDataFrame,
               SpatialPointsDataFrame and SpatialLinesDataFrame")
+        }
     }
+
+
+}
+
+#' @title Mapping the clusters (rasters)
+#'
+#' @description Internal function to realize maps based on rasters
+#'
+#' @param object A FCMres object
+#' @param undecided A float between 0 and 1 giving the minimum value that an
+#'   observation must get in the membership matrix to not be considered as
+#'   uncertain (default = NULL)
+#' @return A named list with :
+#' \itemize{
+#'         \item ProbaMaps : a list of ggplot maps showing for each group the
+#'         probability of the observations to belong to that group
+#'         \item ClusterMap : a ggplot map showing the most likely group for each observation
+#' }
+#' @importFrom methods as
+#' @keywords internal
+#' @examples
+#' #No example provided, this is an internal function, use the general wrapper function mapClusters
+mapRasters  <- function(object, undecided){
+
+    # realisation des cartes de probabilites
+    ProbaPlots <- lapply(1:ncol(object$Belongings), function(i) {
+        rast <- object$rasters[[i]]
+        spdf <- as(rast, "SpatialPixelsDataFrame")
+        df <- as.data.frame(spdf)
+        colnames(df) <- c("value", "x", "y")
+
+        Plot <- ggplot2::ggplot(df) +
+            ggplot2::geom_raster(ggplot2::aes_string(x="x", y="y", fill="value"), alpha=0.8) +
+            ggplot2::scale_fill_gradient(low = "white", high = "blue") +
+            ggplot2::coord_fixed(ratio = 1)+
+            ggplot2::theme(
+                axis.title = ggplot2::element_blank(),
+                axis.text = ggplot2::element_blank(),
+                axis.ticks = ggplot2::element_blank()
+            ) +
+            ggplot2::labs(title = paste("membership values for group ",i,sep=""))
+        return(Plot)
+    })
+
+    #finding the uncertain pixels
+    if(is.null(undecided)){
+        undecided <- 0
+    }
+    #finding for each pixel the max probability
+    uncertain_vec <- undecidedUnits(object$Belongings, tol = undecided, out = "numeric")
+    rast <- object$rasters[[1]]
+    vec <- rep(NA, times = raster::ncell(rast))
+    vec[object$missing] <- uncertain_vec
+    raster::values(rast) <- vec
+
+    spdf <- as(rast, "SpatialPixelsDataFrame")
+    df <- as.data.frame(spdf)
+    colnames(df) <- c("value", "x", "y")
+    df$values <- as.character(df$value)
+    df$values <- ifelse(df$values == "-1", "undecided", paste("group", df$values, sep = " "))
+
+    colors <- RColorBrewer::brewer.pal(ncol(object$Belongings),"Set3")
+    if("undecided" %in% df$values){
+        colors <- c(colors, "black")
+    }
+
+    ClusterMap <- ggplot2::ggplot(df) +
+        ggplot2::geom_raster(ggplot2::aes_string(x = "x", y = "y", fill = "values")) +
+        ggplot2::scale_fill_discrete(type = colors) +
+        ggplot2::coord_fixed(ratio = 1)+
+        ggplot2::theme(
+            legend.title = ggplot2::element_blank(),
+            axis.title = ggplot2::element_blank(),
+            axis.text = ggplot2::element_blank(),
+            axis.ticks = ggplot2::element_blank()
+        )
+    return(list(ProbaMaps = ProbaPlots, ClusterPlot = ClusterMap))
 }
 
 
@@ -360,8 +165,7 @@ mapClusters <- function(geodata, belongmatrix, undecided = NULL) {
 mapPolygons <- function(geodata, belongmatrix, undecided = NULL){
     belongmatrix <- as.data.frame(belongmatrix)
     names(belongmatrix) <- gsub(" ", "", names(belongmatrix), fixed = TRUE)
-    geodata@data <- belongmatrix
-    geodata$OID <- as.character(1:nrow(geodata@data))
+    geodata@data <- cbind(geodata@data,belongmatrix)
 
     # attribution des groupes
     Groups <- names(belongmatrix)[max.col(belongmatrix, ties.method = "first")]
@@ -373,8 +177,10 @@ mapPolygons <- function(geodata, belongmatrix, undecided = NULL){
     }
     geodata$Cluster <- Groups
     geodata$Undecided <- Undecided
-    FortiData <- broom::tidy(geodata, region = "OID")
-    FortiData <- merge(FortiData, geodata@data, by.x = "id", by.y = "OID")
+    FortiData <- ggplot2::fortify(geodata, region = "OID")
+    FortiData$OID <- FortiData$id
+    geodata$OID <- rownames(geodata@data)
+    FortiData <- dplyr::left_join(FortiData, geodata@data, by = "OID")
     # realisation des cartes de probabilites
     ProbaPlots <- lapply(names(belongmatrix), function(Name) {
         Plot <- ggplot2::ggplot(FortiData) +
@@ -430,7 +236,6 @@ mapLines <- function(geodata, belongmatrix, undecided = NULL){
     belongmatrix <- as.data.frame(belongmatrix)
     names(belongmatrix) <- gsub(" ", "", names(belongmatrix), fixed = TRUE)
     geodata@data <- cbind(geodata@data, belongmatrix)
-    invisible(capture.output(FortiData <- broom::tidy(geodata, region = "OID")))
 
     # attribution des groupes
     Groups <- names(belongmatrix)[max.col(belongmatrix, ties.method = "first")]
@@ -441,9 +246,10 @@ mapLines <- function(geodata, belongmatrix, undecided = NULL){
         Undecided <- rep("Ok", length(Groups))
     }
     geodata$Cluster <- Groups
-    geodata$Undecided <- Undecided
-    FortiData <- broom::tidy(geodata, region = "OID")
-    FortiData <- merge(FortiData, geodata@data, by.x = "id", by.y = "OID")
+    FortiData <- ggplot2::fortify(geodata, region = "OID")
+    FortiData$OID <- FortiData$id
+    geodata$OID <- rownames(geodata@data)
+    FortiData <- dplyr::left_join(FortiData, geodata@data, by = "OID")
     # realisation des cartes de probabilites
     ProbaPlots <- lapply(names(belongmatrix), function(Name) {
         Plot <- ggplot2::ggplot(FortiData) +
@@ -545,131 +351,6 @@ mapPoints <- function(geodata, belongmatrix, undecided = NULL){
 }
 
 
-#' @title Descriptive statistics by group
-#'
-#' @description Calculate some descriptive statistics of each group
-#'
-#' @param data The original dataframe used for the classification
-#' @param belongmatrix A membership matrix
-#' @param weighted A boolean indicating if the summary statistics must use the
-#'   membership matrix columns as weights (TRUE) or simply assign each
-#'   observation to its most likely cluster and compute the statistics on each
-#'   subset (FALSE)
-#' @param dec An integer indicating the number of digits to keep when rounding
-#' (default is 3)
-#' @param silent A boolean indicating if the results must be printed or silently returned
-#' @return A list of length k (the number of group). Each element of the list is
-#'   a dataframe with summary statistics for the variables of data for each
-#'   group
-#' @export
-#' @importFrom dplyr %>%
-#' @importFrom grDevices rgb
-#' @importFrom stats quantile sd weighted.mean
-#' @importFrom utils setTxtProgressBar txtProgressBar
-#' @examples
-#' data(LyonIris)
-#' AnalysisFields <-c("Lden","NO2","PM25","VegHautPrt","Pct0_14","Pct_65","Pct_Img",
-#' "TxChom1564","Pct_brevet","NivVieMed")
-#' dataset <- LyonIris@data[AnalysisFields]
-#' queen <- spdep::poly2nb(LyonIris,queen=TRUE)
-#' Wqueen <- spdep::nb2listw(queen,style="W")
-#' result <- SFCMeans(dataset, Wqueen,k = 5, m = 1.5, alpha = 1.5, standardize = TRUE)
-#' summarizeClusters(dataset, result$Belongings)
-summarizeClusters <- function(data, belongmatrix, weighted = TRUE, dec = 3, silent=TRUE) {
-    belongmatrix <- as.data.frame(belongmatrix)
-    if (weighted) {
-        Summaries <- lapply(1:ncol(belongmatrix), function(c) {
-            W <- belongmatrix[, c]
-            Values <- apply(data, 2, function(x) {
-                Q5 <- as.numeric(round(reldist::wtd.quantile(x, q = 0.05, na.rm = TRUE, weight = W),dec))
-                Q10 <- as.numeric(round(reldist::wtd.quantile(x, q = 0.1, na.rm = TRUE, weight = W),dec))
-                Q25 <- as.numeric(round(reldist::wtd.quantile(x, q = 0.25, na.rm = TRUE, weight = W),dec))
-                Q50 <- as.numeric(round(reldist::wtd.quantile(x, q = 0.5, na.rm = TRUE, weight = W),dec))
-                Q75 <- as.numeric(round(reldist::wtd.quantile(x, q = 0.75, na.rm = TRUE, weight = W),dec))
-                Q90 <- as.numeric(round(reldist::wtd.quantile(x, q = 0.9, na.rm = TRUE, weight = W),dec))
-                Q95 <- as.numeric(round(reldist::wtd.quantile(x, q = 0.95, na.rm = TRUE, weight = W),dec))
-                Mean <- as.numeric(round(weighted.mean(x, W),dec))
-                Std <- round(sqrt(reldist::wtd.var(x, weight=W)),dec)
-                N <-
-                return(list(Q5 = Q5, Q10 = Q10, Q25 = Q25, Q50 = Q50,
-                            Q75 = Q75, Q90 = Q90, Q95 = Q95,
-                            Mean = Mean, Std = Std))
-            })
-            DF <- do.call(cbind, Values)
-            if(silent==FALSE){
-                print(paste("Statistic summary for cluster ", c, sep = ""))
-                print(DF)
-            }
-
-            return(DF)
-        })
-        names(Summaries) <- paste("Cluster_", c(1:ncol(belongmatrix)), sep = "")
-        return(Summaries)
-
-    } else {
-        Groups <- colnames(belongmatrix)[max.col(belongmatrix, ties.method = "first")]
-        data$Groups <- Groups
-        Summaries <- lapply(unique(data$Groups), function(c) {
-            DF <- subset(data, data$Groups == c)
-            DF$Groups <- NULL
-            Values <- apply(DF, 2, function(x) {
-                Q5 <- as.numeric(round(quantile(x, probs = 0.05, na.rm = TRUE),dec))
-                Q10 <- as.numeric(round(quantile(x, probs = 0.1, na.rm = TRUE),dec))
-                Q25 <- as.numeric(round(quantile(x, probs = 0.25, na.rm = TRUE),dec))
-                Q50 <- as.numeric(round(quantile(x, probs = 0.5, na.rm = TRUE),dec))
-                Q75 <- as.numeric(round(quantile(x, probs = 0.75, na.rm = TRUE),dec))
-                Q90 <- as.numeric(round(quantile(x, probs = 0.9, na.rm = TRUE),dec))
-                Q95 <- as.numeric(round(quantile(x, probs = 0.95, na.rm = TRUE),dec))
-                Mean <- round(mean(x),dec)
-                Std <- round(sd(x),dec)
-                return(list(Q5 = Q5, Q10 = Q10, Q25 = Q25, Q50 = Q50,
-                            Q75 = Q75, Q90 = Q90, Q95 = Q95,
-                            Mean = Mean, Std = Std))
-            })
-            DF <- do.call(cbind, Values)
-            if(silent==FALSE){
-                print(paste("Statistic summary for cluster ", c, sep = ""))
-                print(DF)
-            }
-
-            return(DF)
-        })
-        names(Summaries) <- paste("Cluster_", c(1:ncol(belongmatrix)), sep = "")
-        return(Summaries)
-    }
-}
-
-
-#' @title Undecided observations
-#'
-#' @description Identify the observation for with the classification is uncertain
-#'
-#' @param belongmatrix The membership matrix obtained at the end of the algorithm
-#' @param tol A float indicating the minimum required level of membership to be
-#'   not considered as undecided
-#' @return A vector indicating the most likely group for each observation or
-#'   "Undecided" if the maximum probability for the observation does not reach
-#'   the value of the tol parameter
-#' @export
-#' @examples
-#' data(LyonIris)
-#' AnalysisFields <-c("Lden","NO2","PM25","VegHautPrt","Pct0_14","Pct_65","Pct_Img",
-#' "TxChom1564","Pct_brevet","NivVieMed")
-#' dataset <- LyonIris@data[AnalysisFields]
-#' queen <- spdep::poly2nb(LyonIris,queen=TRUE)
-#' Wqueen <- spdep::nb2listw(queen,style="W")
-#' result <- SFCMeans(dataset, Wqueen,k = 5, m = 1.5, alpha = 1.5, standardize = TRUE)
-#' undecidedUnits(result$Belongings, tol = 0.45)
-undecidedUnits <- function(belongmatrix, tol = 0.1) {
-    belongmatrix <- as.data.frame(belongmatrix)
-    groups <- colnames(belongmatrix)[max.col(belongmatrix, ties.method = "first")]
-    rowMax <- do.call(pmax, belongmatrix)
-    DF <- data.frame(groups = groups, maxprob = rowMax)
-    return(ifelse(DF$maxprob < tol, "Undecided", DF$groups))
-}
-
-
-
 #' @title Spider chart
 #'
 #' @description Display spider charts to quickly compare values between groups
@@ -755,6 +436,7 @@ spiderPlots<- function(data, belongmatrix, chartcolors=NULL){
 #' @importFrom grDevices rgb
 #' @export
 #' @examples
+#' \dontrun{
 #' data(LyonIris)
 #' AnalysisFields <-c("Lden","NO2","PM25","VegHautPrt","Pct0_14","Pct_65","Pct_Img",
 #' "TxChom1564","Pct_brevet","NivVieMed")
@@ -763,7 +445,9 @@ spiderPlots<- function(data, belongmatrix, chartcolors=NULL){
 #' Wqueen <- spdep::nb2listw(queen,style="W")
 #' result <- SFCMeans(dataset, Wqueen,k = 5, m = 1.5, alpha = 1.5, standardize = TRUE)
 #' violinPlots(dataset, result$Groups)
+#' }
 violinPlots <- function(data,groups){
+    data <- as.data.frame(data)
     data$groups <- groups
     groupvar <- "groups"
     Plots <- list()
@@ -831,6 +515,160 @@ barPlots <- function(data,belongmatrix, ncol = 3, what = "mean"){
 
 }
 
+
+#' @title wrapper around spsample
+#'
+#' @description A wrapper around spsample to avoid errors when points are
+#' hard to find
+#'
+#' @param spatial An sp object
+#' @param n The number of points
+#' @param type The original strategy to use, changed for "regular" if the
+#' original strategy fail
+#' @return a SpatialPoints object
+#' @keywords internal
+#' @examples
+#' # this is an internal function, no example provided
+force_sp_sample <- function(spatial, n, type){
+    result <- tryCatch(
+        {sp::spsample(spatial,n,type,iter = 10)},
+        error = function(e){
+            tryCatch(
+                {sp::spsample(spatial,n,type = "regular",iter = 10)},
+                error = function(ee){
+                    stop(sprintf('Error when drawing random points: ',ee$message))
+                }
+                )
+        }
+    )
+    return(result)
+}
+
+
+#' @title Uncertainty map
+#'
+#' @description Return a map to visualize membership matrix
+#'
+#' @details This function maps the membership matrix by plotting
+#' random points in polygons, along lines or around points representing the
+#' original observations. Each cluster is associated with a color and each
+#' random point has a probability to be of that color equal to the membership
+#' value of the feature it belongs itself. Thus, it is possible to
+#' visualize regions with uncertainty and to identify the strongest clusters.
+#'
+#' @param geodata An object of class spatialpolygonesdataframe /
+#' spatiallinesdataframe or spatialpointsdataframe ordered
+#' like the original data used for the clustering.
+#' @param belongmatrix A membership matrix
+#' @param njit The number of points to map on each feature.
+#' @param radius When mapping points, the radius indicates how far random
+#' points will be plotted around the original features.
+#' @param colors A vector of colors to use for the groups.
+#' @param pt_size A float giving the size of the random points on the final
+#' map (default is 0.05)
+#' @return a map created with ggplot2
+#' @export
+#' @examples
+#' \dontrun{
+#' data(LyonIris)
+#' AnalysisFields <-c("Lden","NO2","PM25","VegHautPrt","Pct0_14","Pct_65","Pct_Img",
+#'   "TxChom1564","Pct_brevet","NivVieMed")
+#' dataset <- LyonIris@data[AnalysisFields]
+#' queen <- spdep::poly2nb(LyonIris,queen=TRUE)
+#' Wqueen <- spdep::nb2listw(queen,style="W")
+#' result <- SFCMeans(dataset, Wqueen,k = 5, m = 1.5, alpha = 1.5, standardize = TRUE)
+#' uncertaintyMap(LyonIris, result$Belongings)
+#' }
+uncertaintyMap <- function(geodata, belongmatrix, njit = 150, radius = NULL, colors = NULL, pt_size = 0.05){
+
+    geodata$tmpOID <- 1:nrow(geodata)
+    groups <- 1:ncol(belongmatrix)
+    cls <- class(geodata)[[1]]
+
+    if(cls=="SpatialPolygonsDataFrame"){
+        geodata$area <- rgeos::gArea(geodata, byid = TRUE)
+
+    }else if(cls=="SpatialLinesDataFrame"){
+        geodata$area <- rgeos::gLength(geodata, byid = TRUE)
+    }else if(cls=="SpatialPointsDataFrame"){
+        geodata$area <- 1
+        coords <- sp::coordinates(geodata)
+        geodata$X <- coords[,1]
+        geodata$Y <- coords[,2]
+        if(is.null(radius)){
+            stop("When mapping points, the parameter radius can not be NULL")
+        }
+    }else{
+        stop("geodata must be one of SpatialPolygonsDataFrame, SpatialLinesDataFrame or SpatialPointsDataFrame")
+    }
+    maxA <- max(geodata$area)
+    rt <- njit / maxA
+
+
+    allsppts <- lapply(1:nrow(geodata), function(i){
+        belong <- belongmatrix[i,]
+        poly <- geodata[i,]
+
+        if(cls != "SpatialPointsDataFrame"){
+            n <- round(poly$area*rt)
+            if(n < 10){
+                n <-10
+            }
+            pts <- force_sp_sample(poly,n, type = "random")
+            coords <- sp::coordinates(pts)
+            df <- data.frame(
+                tmpOID = i,
+                gp = sample(groups,size = n,replace = TRUE, prob = belong),
+                X = coords[,1],
+                Y = coords[,2]
+            )
+
+        }else{
+            df <- data.frame(
+                tmpOID = i,
+                X = poly$X + stats::runif(njit, min = -1*(radius), max = radius),
+                Y = poly$Y + stats::runif(njit, min = -1*(radius), max = radius),
+                gp = sample(groups,size = njit,replace = TRUE, prob = belong)
+            )
+        }
+        return(df)
+
+    })
+    df <- do.call(rbind,allsppts)
+
+    if(is.null(colors)){
+        colors <- c("#1F77B4","#FF7F0E","#2CA02C","#D62728","#9467BD","#8C564B",
+                    "#E377C2","#7F7F7F","#BCBD22","#17BECF","#AEC7E8","#FFBB78",
+                    "#98DF8A","#FF9896","#C5B0D5","#C49C94","#F7B6D2","#C7C7C7",
+                    "#DBDB8D","#9EDAE5")[1:ncol(belongmatrix)]
+    }
+
+    df$gp <-as.character(df$gp)
+    names(colors) <- as.character(groups)
+
+    uncertain_map <- ggplot2::ggplot(df) +
+        ggplot2::geom_point(ggplot2::aes_string(x = "X", y = "Y", color = "gp"), size = pt_size) +
+        ggplot2::scale_colour_manual(values = colors) +
+        ggplot2::coord_fixed(ratio = 1)+
+        ggplot2::theme(
+            axis.title = ggplot2::element_blank(),
+            axis.text = ggplot2::element_blank(),
+            axis.ticks = ggplot2::element_blank()
+        )
+    if(cls == "SpatialPolygonsDataFrame"){
+        FortiData <- ggplot2::fortify(geodata, region = "tmpOID")
+        uncertain_map <- uncertain_map +
+            ggplot2::geom_polygon(data = FortiData, mapping = ggplot2::aes_string(x = "long",
+                                                      y = "lat",
+                                                      group = "group"),
+                                  fill = "white", colour = "black", size = 0.1, alpha = 0)
+    }
+
+    return(uncertain_map)
+
+}
+
+
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ##### Functions to select parameters #####
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -842,19 +680,30 @@ barPlots <- function(data,belongmatrix, ncol = 3, what = "mean"){
 #' @param algo A string indicating which method to use (FCM, GFCM, SFCM, SGFCM)
 #' @param parameters A dataframe of parameters with columns k,m and alpha
 #' @param data A dataframe with numeric columns
-#' @param nblistw A list.w object describing the neighbours typically produced
-#'   by the spdep package
+#' @template nblistw-arg
+#' @template window-arg
 #' @param standardize A boolean to specify if the variable must be centered and
 #'   reduce (default = True)
 #' @param spconsist A boolean indicating if the spatial consistency must be
 #' calculated
 #' @param classidx A boolean indicating if the quality of classification
 #' indices must be calculated
+#' @param nrep An integer indicating the number of permutation to do to simulate
+#'   the random distribution of the spatial inconsistency. Only used if spconsist
+#'   is TRUE.
+#' @param indices A character vector with the names of the indices to calculate, to
+#' evaluate clustering quality. default is :c("Silhouette.index", "Partition.entropy",
+#' "Partition.coeff", "XieBeni.index", "FukuyamaSugeno.index", "Explained.inertia").
+#' Other available indices are : "DaviesBoulin.index", "CalinskiHarabasz.index",
+#' "GD43.index", "GD53.index" and "Negentropy.index".
 #' @param maxiter An integer for the maximum number of iteration
 #' @param tol The tolerance criterion used in the evaluateMatrices function for
 #'   convergence assessment
 #' @param seed An integer used for random number generation. It ensures that the
 #' start centers will be the same if the same integer is selected.
+#' @param init A string indicating how the initial centers must be selected. "random"
+#' indicates that random observations are used as centers. "kpp" use a distance based method
+#' resulting in more dispersed centers at the beginning. Both of them are heuristic.
 #' @param verbose A boolean indicating if a progressbar should be displayed
 #' @return a DataFrame containing for each combinations of parameters several clustering
 #' quality indexes.
@@ -862,22 +711,32 @@ barPlots <- function(data,belongmatrix, ncol = 3, what = "mean"){
 #' @keywords internal
 #' @examples
 #' #No example provided, this is an internal function
-eval_parameters <- function(algo, parameters, data, nblistw = NULL, standardize = TRUE ,spconsist = FALSE, classidx = TRUE, tol, maxiter, seed=NULL, verbose = TRUE){
+eval_parameters <- function(algo, parameters, data, nblistw = NULL, window = NULL, standardize = TRUE,
+                            spconsist = FALSE, classidx = TRUE, nrep = 30, indices = NULL,
+                            tol, maxiter, seed = NULL, init = "random", verbose = TRUE){
     if(algo == "FCM"){
-        exefun <- function(data,x, lw){
-            return(CMeans(data, x$k, x$m, maxiter = maxiter, tol = tol, standardize = standardize, verbose = FALSE, seed = seed))
+        exefun <- function(data,x, ...){
+            return(CMeans(data, x$k, x$m, maxiter = maxiter, tol = tol, standardize = standardize,
+                          verbose = FALSE, seed = seed, init = init))
         }
     }else if(algo == "GFCM"){
-        exefun <- function(data,x, lw){
-            return(GCMeans(data, x$k, x$m, x$beta, maxiter = maxiter, tol = tol, standardize = standardize, verbose = FALSE, seed = seed))
+        exefun <- function(data,x,... ){
+            return(GCMeans(data, x$k, x$m, x$beta, maxiter = maxiter, tol = tol, standardize = standardize,
+                           verbose = FALSE, seed = seed, init = init))
         }
     }else if(algo == "SFCM"){
-        exefun <- function(data,x, lw){
-            return(SFCMeans(data, lw, x$k, x$m, x$alpha, x$lag_method, maxiter = maxiter, tol = tol, standardize = standardize, verbose = FALSE, seed = seed))
+        exefun <- function(data,x,...){
+            dots <- list(...)
+            return(SFCMeans(data, dots$lw, x$k, x$m, x$alpha, x$lag_method, window = dots$wd,
+                            maxiter = maxiter, tol = tol, standardize = standardize,
+                            verbose = FALSE, seed = seed, init = init))
         }
     }else if(algo == "SGFCM"){
-        exefun <- function(data,x, lw){
-            return(SGFCMeans(data, lw, x$k, x$m, x$alpha, x$beta, x$lag_method, maxiter = maxiter, tol = tol, standardize = standardize, verbose = FALSE, seed = seed))
+        exefun <- function(data,x,...){
+            dots <- list(...)
+            return(SGFCMeans(data, dots$lw, x$k, x$m, x$alpha, x$beta, x$lag_method, window = dots$wd,
+                             maxiter = maxiter, tol = tol, standardize = standardize,
+                             verbose = FALSE, seed = seed, init = init))
         }
     }else{
         stop("The algo selected must be one in FCM, GFCM, SFCM, SGFCM")
@@ -889,26 +748,28 @@ eval_parameters <- function(algo, parameters, data, nblistw = NULL, standardize 
     cnt <- 1
     allIndices <- lapply(1:nrow(parameters), function(i){
         row <- parameters[i,]
-        if(verbose){
-            setTxtProgressBar(pb, cnt)
-        }
         cnt <<- cnt+1
         templistw <- nblistw[[row$listsw]]
-        result <- exefun(data,row,templistw)
+        tempwindow <- window[[row$window]]
+        result <- exefun(data, row, lw = templistw, wd = tempwindow)
         #calculating the quality indexes
-        indices <- list()
+        indices_values <- list()
         if(classidx){
-            indices <- calcqualityIndexes(result$Data,result$Belongings,as.numeric(row[[2]]))
+            indices_values <- calcqualityIndexes(result$Data,result$Belongings,as.numeric(row[[2]]),
+                                          indices = indices)
         }
         if(spconsist){
             #calculating spatial diag
-            consist <- spConsistency(result$Belongings, templistw, nrep = 30)
-            indices$spConsistency <- consist$Mean
-            indices$spConsistency_05 <- consist$prt05
-            indices$spConsistency_95 <- consist$prt95
+            consist <- spConsistency(result, nrep = nrep)
+            indices_values$spConsistency <- consist$Mean
+            indices_values$spConsistency_05 <- consist$prt05
+            indices_values$spConsistency_95 <- consist$prt95
+        }
+        if(verbose){
+            setTxtProgressBar(pb, cnt)
         }
 
-        return(unlist(indices))
+        return(unlist(indices_values))
     })
     dfIndices <- data.frame(do.call(rbind,allIndices))
     dfIndices$k <- parameters$k
@@ -916,6 +777,7 @@ eval_parameters <- function(algo, parameters, data, nblistw = NULL, standardize 
     if(algo %in% c("SFCM","SGFCM")){
         dfIndices$alpha <- parameters$alpha
         dfIndices$listw <- parameters$listsw
+        dfIndices$window <- parameters$window
         dfIndices$lag_method <- parameters$lag_method
     }
     if(algo %in% c("GFCM","SGFCM")){
@@ -930,7 +792,7 @@ eval_parameters <- function(algo, parameters, data, nblistw = NULL, standardize 
 #' @description Function to select the parameters for a clustering algorithm.
 #'
 #' @param algo A string indicating which method to use (FCM, GFCM, SFCM, SGFCM)
-#' @param data A dataframe with numeric columns
+#' @param data A dataframe with numeric columns or a list of rasters.
 #' @param k A sequence of values for k to test (>=2)
 #' @param m A sequence of values for m to test
 #' @param alpha A sequence of values for alpha to test (NULL if not required)
@@ -939,18 +801,34 @@ eval_parameters <- function(algo, parameters, data, nblistw = NULL, standardize 
 #'  produced by the spdep package (NULL if not required)
 #' @param lag_method A string indicating if a classical lag must be used
 #' ("mean") or if a weighted median must be used ("median"). Both can be
-#' tested by specifying a vector : c("mean","median")
+#' tested by specifying a vector : c("mean","median"). When working with rasters,
+#' the string must be parsable to a function like mean, min, max, sum, etc. and will
+#' be applied to all the pixels values in the window designated by the parameter window
+#' and weighted according to the values of this matrix.
+#' @param window A list of windows to use to calculate neighbouring values if
+#' rasters are used.
 #' @param standardize A boolean to specify if the variable must be centered and
 #'   reduce (default = True)
 #' @param spconsist A boolean indicating if the spatial consistency must be
 #' calculated
 #' @param classidx A boolean indicating if the quality of classification
 #' indices must be calculated
+#' @param nrep An integer indicating the number of permutation to do to simulate
+#'   the random distribution of the spatial inconsistency. Only used if spconsist
+#'   is TRUE.
+#' @param indices A character vector with the names of the indices to calculate, to
+#' evaluate clustering quality. default is :c("Silhouette.index", "Partition.entropy",
+#' "Partition.coeff", "XieBeni.index", "FukuyamaSugeno.index", "Explained.inertia").
+#' Other available indices are : "DaviesBoulin.index", "CalinskiHarabasz.index",
+#' "GD43.index", "GD53.index" and "Negentropy.index".
 #' @param maxiter An integer for the maximum number of iteration
 #' @param tol The tolerance criterion used in the evaluateMatrices function for
 #'   convergence assessment
 #' @param seed An integer used for random number generation. It ensures that the
 #' start centers will be the same if the same integer is selected.
+#' @param init A string indicating how the initial centers must be selected. "random"
+#' indicates that random observations are used as centers. "kpp" use a distance based method
+#' resulting in more dispersed centers at the beginning. Both of them are heuristic.
 #' @param verbose A boolean indicating if a progressbar should be displayed
 #' @return A dataframe with indicators assessing the quality of classifications
 #' @export
@@ -967,7 +845,10 @@ eval_parameters <- function(algo, parameters, data, nblistw = NULL, standardize 
 #' values <- select_parameters(algo = "SFCM", dataset, k = 5, m = seq(2,3,0.1),
 #'     alpha = seq(0,2,0.1), nblistw = Wqueen, spconsist=FALSE)
 #' }
-select_parameters <- function(algo,data,k,m,alpha = NA, beta = NA, nblistw=NULL, lag_method="mean", spconsist = TRUE, classidx = TRUE, standardize = TRUE, maxiter = 500, tol = 0.01, seed=NULL, verbose = TRUE){
+select_parameters <- function(algo,data,k,m,alpha = NA, beta = NA, nblistw=NULL, lag_method="mean", window = NULL,
+                              spconsist = TRUE, classidx = TRUE, nrep = 30, indices = NULL,
+                              standardize = TRUE, maxiter = 500, tol = 0.01,
+                              seed=NULL, init = "random", verbose = TRUE){
 
     if(spconsist==FALSE & classidx==FALSE){
         stop("one of spconsist and classidx must be TRUE")
@@ -976,11 +857,21 @@ select_parameters <- function(algo,data,k,m,alpha = NA, beta = NA, nblistw=NULL,
     if(class(nblistw)[[1]]!="list"){
         nblistw <- list(nblistw)
     }
-    allcombinaisons <- expand.grid(k=k,m=m,alpha=alpha,beta = beta,listsw=1:length(nblistw),lag_method=lag_method)
+
+    if(class(window)[[1]] != "list"){
+        window <- list(window)
+    }
+    if(is.null(indices)){
+        indices <- c("Silhouette.index", "Partition.entropy", "Partition.coeff", "XieBeni.index", "FukuyamaSugeno.index", "Explained.inertia")
+    }
+
+    allcombinaisons <- expand.grid(k=k,m=m,alpha=alpha,beta = beta,listsw=1:length(nblistw),lag_method=lag_method, window = 1:length(window))
 
     print(paste("number of combinaisons to estimate : ",nrow(allcombinaisons)))
-    dfIndices <- eval_parameters(algo,allcombinaisons, data, nblistw, standardize,
-        spconsist, classidx, tol, maxiter, seed, verbose)
+    dfIndices <- eval_parameters(algo, allcombinaisons, data, nblistw, window, standardize,
+        spconsist, classidx, nrep, indices,
+        tol, maxiter, seed, init = init, verbose = verbose)
+    return(dfIndices)
 }
 
 
@@ -1018,11 +909,24 @@ selectParameters <- select_parameters
 #'  produced by the spdep package (NULL if not required)
 #' @param lag_method A string indicating if a classical lag must be used
 #' ("mean") or if a weighted median must be used ("median"). Both can be
-#' tested by specifying a vector : c("mean","median")
+#' tested by specifying a vector : c("mean","median"). When working with rasters,
+#' the string must be parsable to a function like mean, min, max, sum, etc. and will
+#' be applied to all the pixels values in the window designated by the parameter window
+#' and weighted according to the values of this matrix.
+#' @param window A list of windows to use to calculate neighbouring values if
+#' rasters are used.
 #' @param spconsist A boolean indicating if the spatial consistency must be
 #' calculated
 #' @param classidx A boolean indicating if the quality of classification
 #' indices must be calculated
+#' @param nrep An integer indicating the number of permutation to do to simulate
+#'   the random distribution of the spatial inconsistency. Only used if spconsist
+#'   is TRUE.
+#' @param indices A character vector with the names of the indices to calculate, to
+#' evaluate clustering quality. default is :c("Silhouette.index", "Partition.entropy",
+#' "Partition.coeff", "XieBeni.index", "FukuyamaSugeno.index", "Explained.inertia").
+#' Other available indices are : "DaviesBoulin.index", "CalinskiHarabasz.index",
+#' "GD43.index", "GD53.index" and "Negentropy.index".
 #' @param standardize A boolean to specify if the variable must be centered and
 #'   reduce (default = True)
 #' @param maxiter An integer for the maximum number of iteration
@@ -1030,6 +934,9 @@ selectParameters <- select_parameters
 #'   convergence assessment
 #' @param seed An integer used for random number generation. It ensures that the
 #' start centers will be the same if the same integer is selected.
+#' @param init A string indicating how the initial centers must be selected. "random"
+#' indicates that random observations are used as centers. "kpp" use a distance based method
+#' resulting in more dispersed centers at the beginning. Both of them are heuristic.
 #' @param chunk_size The size of a chunk used for multiprocessing. Default is 100.
 #' @param verbose A boolean indicating if a progressbar should be displayed
 #' @return A dataframe with indicators assessing the quality of classifications
@@ -1048,12 +955,13 @@ selectParameters <- select_parameters
 #' #FALSE here to reduce the time during package check
 #' values <- select_parameters.mc("SFCM", dataset, k = 5, m = seq(1,2.5,0.1),
 #'     alpha = seq(0,2,0.1), nblistw = Wqueen, spconsist=FALSE)
-#' \dontshow{
-#'    ## R CMD check: make sure any open connections are closed afterward
-#'    if (!inherits(future::plan(), "sequential")) future::plan(future::sequential)
-#' }
+#' ## make sure any open connections are closed afterward
+#' if (!inherits(future::plan(), "sequential")) future::plan(future::sequential)
 #'}
-select_parameters.mc <- function(algo,data,k,m, alpha = NA, beta = NA, nblistw = NULL, lag_method="mean",  spconsist = TRUE, classidx = TRUE, standardize = TRUE, maxiter = 500, tol = 0.01, seed = NULL, chunk_size=100, verbose = FALSE){
+select_parameters.mc <- function(algo,data,k,m,alpha = NA, beta = NA, nblistw=NULL, lag_method="mean", window = NULL,
+                                 spconsist = TRUE, classidx = TRUE, nrep = 30, indices = NULL,
+                                 standardize = TRUE, maxiter = 500, tol = 0.01, chunk_size = 5,
+                                 seed=NULL, init = "random", verbose = TRUE){
 
     if(spconsist==FALSE & classidx==FALSE){
         stop("one of spconsist and classidx must be TRUE")
@@ -1062,15 +970,23 @@ select_parameters.mc <- function(algo,data,k,m, alpha = NA, beta = NA, nblistw =
     if(class(nblistw)[[1]]!="list"){
         nblistw <- list(nblistw)
     }
-    if(is.null(seed)){
-        seed <- FALSE
+
+    if(class(window)[[1]] != "list"){
+        window <- list(window)
     }
-    allcombinaisons <- expand.grid(k=k,m=m,alpha=alpha, beta = beta, listsw=1:length(nblistw), lag_method=lag_method)
+    if(is.null(indices)){
+        indices <- c("Silhouette.index", "Partition.entropy", "Partition.coeff", "XieBeni.index", "FukuyamaSugeno.index", "Explained.inertia")
+    }
+
+    allcombinaisons <- expand.grid(k=k,m=m,alpha=alpha,beta = beta,listsw=1:length(nblistw),lag_method=lag_method, window = 1:length(window))
+
+
     if (verbose){
         print(paste("number of combinaisons to estimate : ",nrow(allcombinaisons)))
     }
     chunks <- split(1:nrow(allcombinaisons), rep(1:ceiling(nrow(allcombinaisons) / chunk_size),
                                        each = chunk_size, length.out = nrow(allcombinaisons)))
+
     chunks <- lapply(chunks,function(x){return(allcombinaisons[x,])})
     # step2 : starting the function
     iseq <- 1:length(chunks)
@@ -1080,8 +996,9 @@ select_parameters.mc <- function(algo,data,k,m, alpha = NA, beta = NA, nblistw =
             values <- future.apply::future_lapply(iseq, function(i) {
                 sprintf(algo)
                 parameters <- chunks[[i]]
-                indices <- eval_parameters(algo, parameters, data, nblistw, standardize,
-                                                             spconsist, classidx, tol, maxiter)
+                indices <- eval_parameters(algo, parameters, data, nblistw, window, standardize,
+                                           spconsist, classidx, nrep, indices,
+                                           tol, maxiter, init = init, verbose = FALSE)
                 p(sprintf("i=%g", i))
                 return(indices)
             }, future.seed = seed)
@@ -1089,9 +1006,9 @@ select_parameters.mc <- function(algo,data,k,m, alpha = NA, beta = NA, nblistw =
     }else{
         values <- future.apply::future_lapply(iseq, function(i) {
             parameters <- chunks[[i]]
-            indices <- eval_parameters(algo, parameters, data, nblistw, standardize,
-                                                    spconsist, classidx, tol, maxiter,
-                                       verbose = FALSE)
+            indices <- eval_parameters(algo, parameters, data, nblistw, window, standardize,
+                                       spconsist, classidx, nrep, indices,
+                                       tol, maxiter, init = init, verbose = FALSE)
             return(indices)
         },future.seed = seed)
     }
@@ -1147,10 +1064,11 @@ selectParameters.mc <- select_parameters.mc
 #' Wqueen <- spdep::nb2listw(queen,style="W")
 #' Wqueen2 <- adjustSpatialWeights(dataset,queen,style="C")
 adjustSpatialWeights <- function(data,listw,style){
+    data <- as.matrix(data)
     new_weights <- lapply(1:nrow(data),function(i){
         row <- data[i,]
         neighbours <- data[listw[[i]],]
-        dists <- 1/calcEuclideanDistance(neighbours,row)
+        dists <- 1/calcEuclideanDistance2(neighbours,row)
         weights <- dists / sum(dists)
         return(weights)
     })
@@ -1159,14 +1077,13 @@ adjustSpatialWeights <- function(data,listw,style){
 }
 
 
-
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ##### Utilitary functions #####
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 #' @title Convert categories to membership matrix
 #'
-#' @description Function to Convert categories to membership matrix (binary matrix)
+#' @description Function to convert a character vector to a membership matrix (binary matrix)
 #'
 #' @param categories A vector with the categories of each observation
 #'

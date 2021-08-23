@@ -9,12 +9,16 @@ eval_parameters(
   parameters,
   data,
   nblistw = NULL,
+  window = NULL,
   standardize = TRUE,
   spconsist = FALSE,
   classidx = TRUE,
+  nrep = 30,
+  indices = NULL,
   tol,
   maxiter,
   seed = NULL,
+  init = "random",
   verbose = TRUE
 )
 }
@@ -26,7 +30,14 @@ eval_parameters(
 \item{data}{A dataframe with numeric columns}
 
 \item{nblistw}{A list.w object describing the neighbours typically produced
-by the spdep package}
+by the spdep package. Required if data is a dataframe, see the parameter window
+if you use a list of rasters as input.}
+
+\item{window}{If data is a list of rasters, then a window must be specified instead of
+a list.w object. It will be used to calculate a focal function on each raster. The
+window must be a square numeric matrix with odd dimensions (such 3x3). The values in
+the matrix indicate the weight to give to each pixel and the centre of the matrix is
+the centre of the focal function.}
 
 \item{standardize}{A boolean to specify if the variable must be centered and
 reduce (default = True)}
@@ -37,6 +48,16 @@ calculated}
 \item{classidx}{A boolean indicating if the quality of classification
 indices must be calculated}
 
+\item{nrep}{An integer indicating the number of permutation to do to simulate
+the random distribution of the spatial inconsistency. Only used if spconsist
+is TRUE.}
+
+\item{indices}{A character vector with the names of the indices to calculate, to
+evaluate clustering quality. default is :c("Silhouette.index", "Partition.entropy",
+"Partition.coeff", "XieBeni.index", "FukuyamaSugeno.index", "Explained.inertia").
+Other available indices are : "DaviesBoulin.index", "CalinskiHarabasz.index",
+"GD43.index", "GD53.index" and "Negentropy.index".}
+
 \item{tol}{The tolerance criterion used in the evaluateMatrices function for
 convergence assessment}
 
@@ -44,6 +65,10 @@ convergence assessment}
 
 \item{seed}{An integer used for random number generation. It ensures that the
 start centers will be the same if the same integer is selected.}
+
+\item{init}{A string indicating how the initial centers must be selected. "random"
+indicates that random observations are used as centers. "kpp" use a distance based method
+resulting in more dispersed centers at the beginning. Both of them are heuristic.}
 
 \item{verbose}{A boolean indicating if a progressbar should be displayed}
 }

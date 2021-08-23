@@ -4,14 +4,16 @@
 \alias{mapClusters}
 \title{Mapping the clusters}
 \usage{
-mapClusters(geodata, belongmatrix, undecided = NULL)
+mapClusters(geodata = NULL, object, undecided = NULL)
 }
 \arguments{
-\item{geodata}{A object of class spatialpolygonesdataframe /
+\item{geodata}{An object of class spatialpolygonesdataframe /
 spatiallinesdataframe or spatialpointsdataframe ordered
-like the original data used for the clustering}
+like the original data used for the clustering. Can be Null if object is
+a FCMres and has been created with rasters.}
 
-\item{belongmatrix}{The membership matrix obtained at the end of the algorithm}
+\item{object}{A FCMres object, typically obtained from functions CMeans,
+GCMeans, SFCMeans, SGFCMeans. Can also be a simple membership matrix.}
 
 \item{undecided}{A float between 0 and 1 giving the minimum value that an
 observation must get in the membership matrix to not be considered as
@@ -30,6 +32,7 @@ A named list with :
 Build some maps to visualize the results of the clustering
 }
 \examples{
+\dontrun{
 data(LyonIris)
 AnalysisFields <-c("Lden","NO2","PM25","VegHautPrt","Pct0_14","Pct_65","Pct_Img",
 "TxChom1564","Pct_brevet","NivVieMed")
@@ -38,4 +41,5 @@ queen <- spdep::poly2nb(LyonIris,queen=TRUE)
 Wqueen <- spdep::nb2listw(queen,style="W")
 result <- SFCMeans(dataset, Wqueen,k = 5, m = 1.5, alpha = 1.5, standardize = TRUE)
 MyMaps <- mapClusters(LyonIris, result$Belongings)
+}
 }

@@ -23,5 +23,27 @@
 #'   \item{Y}{the Y coordinate of the center of the Iris (numeric)}
 #'   ...
 #' }
-#' @source \url{https://data.grandlyon.com/accueil}
+#' @source \url{https://data.grandlyon.com/}
 "LyonIris"
+
+
+#' RasterLayer of the bay of Arcachon
+#'
+#' A Landsat 8 image of the bay of Arcachon (France), with a resolution of 30mx30m
+#' and 6 bands: blue, green, red, near infrared, shortwave infrared 1 and shortwave infrared 2.
+#' The dataset is saved as a Large RasterBrick with the package raster and has the
+#' following crs: EPSG:32630
+#'
+#' @format A Large RasterBrick with 6 bands
+#' \describe{
+#'   \item{blue}{wavelength: 0.45-0.51}
+#'   \item{green}{wavelength: 0.53-0.59}
+#'   \item{red}{wavelength: 0.64-0.67}
+#'   \item{near infrared}{wavelength: 0.85-0.88}
+#'   \item{shortwave infrared}{wavelength: 1.57-1.65}
+#'   \item{shortwave infrared}{wavelength: 2.11-2.29}
+#' }
+#' @source \url{https://earthexplorer.usgs.gov/}
+"Arcachon"
+
+
