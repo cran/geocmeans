@@ -11,7 +11,7 @@
 #' @param data The original dataframe used for the clustering (n*p)
 #' @param belongings A membership matrix (n*k)
 #' @return A float, the fuzzy Silhouette index
-calcSilhouetteIdx <- function(data, belongings){
+calcSilhouetteIdx <- function(data, belongings){ #nocov start
   FS <- tryCatch(
     fclust::SIL.F(data, belongings, alpha = 1),
     error = function(e){
@@ -25,7 +25,8 @@ calcSilhouetteIdx <- function(data, belongings){
       }
   )
   return(FS)
-}
+} #nocov end
+# not tested, come simply from fclust
 
 
 #' @title Negentropy Increment index
@@ -345,9 +346,9 @@ calcCalinskiHarabasz <- function(data, belongmatrix, centers){
 #' The Fukuyama and Sugeno index \insertCite{fukuyama1989new}{geocmeans} is the difference between the compacity of clusters and the separation of clusters. A smaller value indicates a better clustering.
 #' The formula is:
 #'
-#' \deqn{J_{m}=\sum_{j=1}^{n} \sum_{i=1}^{k}\left(\mu_{i j}\right)^{m}\left\|x_{j}-c_{i}\right\|^{2}-\sum_{i=1}^{k}\left\|c_{i}-\bar{c}\right\|^{2}}
+#' \deqn{S(c)=\sum_{k=1}^{n} \sum_{i=1}^{c}\left(U_{i k}\right)^{m}\left(\left\|x_{k}-v_{i}\right\|^{2}-\left\|v_{i}-\bar{x}\right\|^{2}\right) 2}
 #'
-#' with \emph{n} the number of observations, \emph{k} the number of clusters and \eqn{\bar{c}} the mean of the centers of the clusters.
+#' with \emph{n} the number of observations, \emph{k} the number of clusters and \eqn{\bar{x}} the mean of the dataset.
 #'
 #' @references
 #' \insertAllCited{}
@@ -368,14 +369,14 @@ calcCalinskiHarabasz <- function(data, belongmatrix, centers){
 #' result <- SFCMeans(dataset, Wqueen,k = 5, m = 1.5, alpha = 1.5, standardize = TRUE)
 #' calcFukuyamaSugeno(result$Data,result$Belongings, result$Centers, 1.5)
 calcFukuyamaSugeno <- function(data,belongmatrix,centers,m){
-  v_hat <- apply(centers,2,mean)
+  v_hat <- colMeans(data)
   um <- (belongmatrix)**m
   values <- sapply(1:ncol(belongmatrix),function(i){
     w <- um[,i]
     v <- centers[i,]
     t1 <- calcEuclideanDistance2(data,v)
     t2 <- sum((v - v_hat)**2)
-    dists <- (t1 - t2)*w
+    dists <- (t1 - t2) * w * 2
     return(sum(dists))
   })
   return(sum(values))
@@ -462,7 +463,7 @@ calcQualIdx <- function(name, ...){
   }
 
   if(name == "CalinskiHarabasz.index"){
-    val <- calcDaviesBouldin(dots$data, dots$belongmatrix, dots$centers)
+    val <- calcCalinskiHarabasz(dots$data, dots$belongmatrix, dots$centers)
   }
 
   if(name == "DaviesBoulin.index"){
@@ -584,11 +585,11 @@ calcqualityIndexes <- function(data, belongmatrix, m, indices = c("Silhouette.in
 #' Wqueen <- spdep::nb2listw(queen,style="W")
 #' result <- SFCMeans(dataset, Wqueen,k = 5, m = 1.5, alpha = 1.5, standardize = TRUE)
 #' spatialDiag(result, undecided=0.45, nrep=30)
-spatialDiag <- function(object, nblistw = NULL, window = NULL, undecided = NULL, matdist = NULL, nrep = 50) {
+spatialDiag <- function(object, nblistw = NULL, window = NULL, undecided = NULL, matdist = NULL, nrep = 50) { #nocov start
 
-  cls <- class(object)[[1]]
+  # cls <- class(object)[[1]]
   ## prior check of parameters
-  if(cls != "FCMres") {
+  if(inherits(object, "FCMres") == FALSE ) {
     if(is.null(nblistw)){
       stop("if object is not a FCMres object, nblistw must be provided")
     }
@@ -618,7 +619,7 @@ spatialDiag <- function(object, nblistw = NULL, window = NULL, undecided = NULL,
 
   ## check if we are in rasterMode here is a mistake !
   rasterMode <- FALSE
-  if(cls == "FCMres"){
+  if(inherits(object, "FCMres")){
     if(object$isRaster){
       rasterMode <- TRUE
     }
@@ -626,7 +627,7 @@ spatialDiag <- function(object, nblistw = NULL, window = NULL, undecided = NULL,
 
   ## WE ARE NOT IN RASTERMODE ##
   if(rasterMode == FALSE){
-    if(cls != "FCMres"){
+    if(inherits(object, "FCMres") == FALSE){
       membership <- object
       Groups <- (1:ncol(membership))[max.col(membership, ties.method = "first")]
     }else{
@@ -696,4 +697,4 @@ spatialDiag <- function(object, nblistw = NULL, window = NULL, undecided = NULL,
     return(list(MoranValues = morandf, SpConsist = Consist$Mean,
                 SpConsistSamples = Consist$samples, Elsa = Elsa))
   }
-}
+} #nocov end

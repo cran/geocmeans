@@ -159,7 +159,7 @@ SFCM <- SFCMeans(Data, WMat, k = 4, m = 1.5, alpha = 0.7,
                  verbose = FALSE, seed = 456)
 
 ## ----warning=FALSE, eval = FALSE----------------------------------------------
-#  future::plan(future::multiprocess(workers=4))
+#  future::plan(future::multisession(workers=4))
 #  DFindices_SFGCM <- selectParameters.mc(algo = "SGFCM", data = Data,
 #                                 k = 4, m = 1.5, alpha = seq(0,2,0.05),
 #                                 beta = seq(0,0.85,0.05),

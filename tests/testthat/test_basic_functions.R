@@ -12,3 +12,73 @@ test_that("The euclidean distance function return what is expected",{
   expected <- rep(sum((vec-4)**2), times = 3)
   expect_equal(dists, expected)
 })
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Testing the cat_to_belongings
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+test_that("Testing the cat_to_belongings function",{
+  values <- c(1,3,2,1)
+  expected <- cbind(
+    c(1,0,0,1),
+    c(0,0,1,0),
+    c(0,1,0,0)
+  )
+  obtained <- cat_to_belongings(values)
+  expect_true(sum(obtained - expected) == 0)
+})
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Testing the calcLaggedData
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+test_that("Testing the calcLaggedData function",{
+  df1 <- data.frame(
+    x = c(1,2,3,4)
+  )
+
+  nb_mat <- rbind(
+    c(0,1,1,0),
+    c(1,0,0,1),
+    c(1,0,0,1),
+    c(0,1,1,0)
+  )
+
+  nb <- spdep::mat2listw(nb_mat,style = "W")
+
+  # for a simple mean
+  obtained <- calcLaggedData(df1,nb)$x
+  expected <- c(mean(c(2,3)), mean(c(1,4)), mean(c(1,4)), mean(c(2,3)))
+  test1 <- (any(expected != obtained))==FALSE
+
+  # for a median
+  obtained <- calcLaggedData(df1,nb, method = "median")$x
+  expected <- c(3,4,4,3)
+  test2 <- (any(expected != obtained))==FALSE
+
+  expect_true(test1 & test2)
+
+})
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Testing the check_raters_dims
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+test_that("Testing the calcLaggedData function",{
+
+  mat <- rbind(
+    c(1,2,3),
+    c(1,2,3),
+    c(1,2,3)
+  )
+  rast1 <- raster::raster(mat)
+  rast2 <- raster::raster(mat)
+
+  check_raters_dims(list(rast1, rast2))
+
+  rast3 <- raster::raster(matrix(0, ncol = 2, nrow = 3))
+  expect_error({
+    check_raters_dims(list(rast1, rast2, rast3))
+  })
+
+})
+

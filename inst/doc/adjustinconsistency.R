@@ -28,8 +28,8 @@ SFCM <- SFCMeans(Data, WMat, k = 4, m = 1.5, alpha = 0.7,
                  tol = 0.0001, standardize = FALSE,
                  verbose = FALSE, seed = 456)
 
-#calculating the spatial inconsistency index
-consistIndex <- spConsistency(SFCM$Belongings, WMat, nrep = 500)
+#calculating the spatial inconsistency index (more replications are recommanded)
+consistIndex <- spConsistency(SFCM$Belongings, WMat, nrep = 100)
 
 ggplot() + 
   geom_histogram(aes(x = consistIndex$samples),
@@ -42,7 +42,8 @@ ggplot() +
 
 ## ----message=FALSE, warning=FALSE, fig.pos="H", fig.align="center"------------
 WMat2 <- adjustSpatialWeights(Data, WMat$neighbours, style = "C")
-consistIndex2 <- spConsistency(SFCM$Belongings, WMat2, nrep = 500)
+# (more replications are recommanded)
+consistIndex2 <- spConsistency(SFCM$Belongings, WMat2, nrep = 100)
 
 ggplot() + 
   geom_histogram(aes(x = consistIndex2$samples),

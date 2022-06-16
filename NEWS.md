@@ -1,3 +1,15 @@
+# geocmeans 0.2.2
+
+removed the old function future::multiprocess, for future::multisession as suggested in issue #3
+
+# geocmeans 0.2.1.9000
+
+Corrected the bug in the issue #2
+
+# geocmeans 0.2.1
+
+Minor release for correcting minor bugs and providing an updated documentation.
+
 # geocmeans 0.2.0
 
 ## New Features

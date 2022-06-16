@@ -42,6 +42,7 @@
 #'         \item prt05 : the 5th percentile of the spatial consistency index
 #'         \item prt95 : the 95th percentile of the spatial consistency index
 #'         \item samples : all the value of the spatial consistency index
+#'         \item sum_diff : the total sum of squarred difference between observations and their neighbours
 #' }
 #' @export
 #' @examples
@@ -55,7 +56,7 @@
 #' spConsistency(result$Belongings, nblistw = Wqueen, nrep=50)
 spConsistency <- function(object, nblistw = NULL, window = NULL, nrep = 999, adj = FALSE) {
 
-  if(class(object)[[1]] == "FCMres"){
+  if(inherits(object, "FCMres")){
     belongmat <- as.matrix(object$Belongings)
     if(object$isRaster & is.null(window)){
       window <- object$window
@@ -89,8 +90,8 @@ spConsistency <- function(object, nblistw = NULL, window = NULL, nrep = 999, adj
         neighbour <- t(as.matrix(neighbour))
       }
       W <- weights[[i]]
-      diff <- (neighbour-row[col(neighbour)])**2
-      tot <- sum(rowSums(diff) * W)
+      diff <- (neighbour-row[col(neighbour)])**2 * W
+      tot <- sum(rowSums(diff))
       return(tot)
     })
 
@@ -223,7 +224,8 @@ spConsistency <- function(object, nblistw = NULL, window = NULL, nrep = 999, adj
   return(list(Mean = mean(ratio), Median = quantile(ratio, probs = c(0.5)),
               prt05 = quantile(ratio, probs = c(0.05)),
               prt95 = quantile(ratio, probs = c(0.95)),
-              samples = ratio))
+              samples = ratio,
+              sum_diff = totalcons))
 }
 
 
@@ -311,9 +313,9 @@ check_matdist <- function(matdist){
 calcELSA <- function(object, nblistw = NULL, window = NULL, matdist = NULL){
 
   # testing if we have all the required parameters
-  if(class(object)[[1]] != "FCMres"){
+  if(inherits(object, "FCMres") == FALSE){
 
-    if(class(object) != "numeric"){
+    if(inherits(object, "numeric") == FALSE){
       stop("if object is not a FCMres object, it must be a numeric vector")
     }
 
@@ -353,7 +355,7 @@ calcELSA <- function(object, nblistw = NULL, window = NULL, matdist = NULL){
   }
 
   # case 1 : object is a simple vector of categories
-  if(class(object)[[1]] != "FCMres"){
+  if(inherits(object,'FCMres') == FALSE){
     vals <- elsa_vector(object, nblistw, matdist)
   }else{
     # case 2 : the object is a FCMres object
@@ -441,7 +443,7 @@ elsa_vector <- function(categories, nblistw, dist){
 #' # this is an internal function, no example provided
 elsa_raster <- function(rast, window, matdist){
 
-  if(class(window)[[1]] == "matrix"){
+  if(inherits(window, "matrix")){
     u <- unique(window)
     if(length(union(c(0,1),u)) > 2){
       stop("The provided matrix to calculate ELSA is not a binary matrix (0,1)")
@@ -451,7 +453,7 @@ elsa_raster <- function(rast, window, matdist){
     stop("for calculating ELSA on raster, window must be a binary matrix")
   }
 
-  isRaster <- class(rast)[[1]] == "RasterLayer"
+  isRaster <- inherits(rast, "RasterLayer")
 
   if(isRaster){
     mat <- raster::as.matrix(rast)
@@ -523,27 +525,26 @@ elsa_raster <- function(rast, window, matdist){
 calcFuzzyELSA <- function(object, nblistw = NULL, window = NULL, matdist = NULL){
 
   # testing if we have all the required parameters
-  cls <- class(object)[[1]]
-  if(cls %in% c("FCMres","matrix","list") == FALSE){
+  if(inherits(object, c("FCMres","matrix","list")) == FALSE){
     stop("object must be a FCMres object, a matrix or a list of rasters")
   }
 
-  if(cls == "matrix"){
-    sums <- sum(rowSums(object)) != 1
+  if(inherits(object,"matrix")){
+    sums <- rowSums(object) != 1
     if(any(sums)){
       stop("if object is a matrix, the sum of each row must be 1")
     }
   }
 
-  if(cls != "FCMres" & is.null(matdist)){
+  if(inherits(object,"FCMres") == FALSE & is.null(matdist)){
     stop("if object is not a FCMre, matdist must be specified")
   }
 
-  if(cls == "matrix" & is.null(nblistw)){
+  if(inherits(object,"matrix") & is.null(nblistw)){
     stop("if object is a matrix, nblistw must be specified")
   }
 
-  if(cls == "list" & is.null(window)){
+  if(inherits(object,"list") & inherits(object,"list") == FALSE & is.null(window)){
     stop("if object is a list, window must be specified")
   }
 
@@ -554,7 +555,7 @@ calcFuzzyELSA <- function(object, nblistw = NULL, window = NULL, matdist = NULL)
   }
 
 
-  if(cls == "matrix"){
+  if(inherits(object,"matrix")){
     if(nrow(matdist) != ncol(object)){
       stop("the number of columns in object (matrix) must match the number of rows in matdist")
     }
@@ -563,7 +564,7 @@ calcFuzzyELSA <- function(object, nblistw = NULL, window = NULL, matdist = NULL)
     }
   }
 
-  if(cls == "list"){
+  if(inherits(object,"list") & (inherits(object,"FCMres") == FALSE)){
     if(nrow(matdist) != length(object)){
       stop("the number of rasters in object (list) must match the number of rows in matdist")
     }
@@ -572,7 +573,7 @@ calcFuzzyELSA <- function(object, nblistw = NULL, window = NULL, matdist = NULL)
     }
   }
 
-  if(cls == "FCMres"){
+  if(inherits(object,"FCMres")){
     if(object$isRaster){
       if(is.null(object$window) & is.null(window)){
         stop("impossible to extract window from object, window must be provided")
@@ -585,7 +586,7 @@ calcFuzzyELSA <- function(object, nblistw = NULL, window = NULL, matdist = NULL)
   }
 
 
-  if(cls == "FCMres"){
+  if(inherits(object,"FCMres")){
     if(object$isRaster==FALSE){
       #case 1 : object is a FCMres and vector type
       mat <- object$Belongings
@@ -617,15 +618,15 @@ calcFuzzyELSA <- function(object, nblistw = NULL, window = NULL, matdist = NULL)
       return(rast)
     }
 
-  }else if (cls == "matrix"){
+  }else if (inherits(object,"matrix")){
     #case 3 : object is a matrix
     values <- elsa_fuzzy_vector(object, nblistw, matdist)
     return(values)
-  }else if (cls == "list"){
+  }else if (inherits(object,"list")){
     #case 4 : object is a list of rasters
     mats <- lapply(object, raster::as.matrix)
     arr <- do.call(c,mats)
-    arr <- array(arr, dim = c(nrow(mats[[1]]), ncol(mats[[1]]),object$k))
+    arr <- array(arr, dim = c(nrow(mats[[1]]), ncol(mats[[1]]), length(object)))
     values <- Elsa_fuzzy_matrix_window(arr, window, matdist)
     rast <- object[[1]]
     raster::values(rast) <- values
@@ -692,17 +693,17 @@ elsa_fuzzy_vector <- function(memberships, nblistw, matdist){
 #' @examples
 #' # this is an internal function, no example provided
 calcFuzzyElsa_raster <- function(rasters,window,matdist){
-  if(class(rasters[[1]]) == "matrix"){
+  if(inherits(rasters[[1]], "matrix")){
     mats <- rasters
     isRaster <- FALSE
     vals <- do.call(c,mats)
     arr <- array(vals, c(nrow(mats[[1]]),ncol(mats[[1]]),length(rasters)))
-  }else if (class(rasters[[1]]) == "RasterLayer"){
+  }else if (inherits(rasters[[1]], "RasterLayer")){
     mats <- lapply(rasters, raster::as.matrix)
     isRaster <- TRUE
     vals <- do.call(c,mats)
     arr <- array(vals, c(nrow(mats[[1]]),ncol(mats[[1]]),length(rasters)))
-  }else if (class(rasters)[[1]]=="array"){
+  }else if (inherits(rasters,"array")){
     arr <- rasters
     isRaster <- FALSE
   }else{
@@ -737,17 +738,20 @@ calcFuzzyElsa_raster <- function(rasters,window,matdist){
 #' w <- matrix(1, nrow = 3, ncol = 3)
 #' calc_moran_raster(rast, w)
 calc_moran_raster <- function(rast, window){
-  if(class(rast)[[1]] == "RasterLayer"){
+  if(inherits(rast,"RasterLayer")){
     mat <- raster::as.matrix(rast)
-  }else if (class(rast)[[1]] == "matrix"){
+  }else if (inherits(rast,"matrix")){
     mat <- rast
   }else{
     stop("rast parameter must be on of matrix or RasterLayer")
   }
-  if(class(window)[[1]] == "matrix"){
+  if(inherits(window,"matrix")){
     fun <- moranI_matrix_window
-  }else if (class(window)[[1]] == "numeric"){
-    fun <- moranI_matrix
+  }else if (inherits(window, "numeric")){
+    #fun <- moranI_matrix
+    fun <- moranI_matrix_window
+    size <- n+1+n
+    window <- matrix(1, nrow = size, ncol = size)
   }else{
     stop("window parameter must be an integer or a matrix")
   }
@@ -769,17 +773,17 @@ calc_moran_raster <- function(rast, window){
 #' w <- matrix(1, nrow = 3, ncol = 3)
 #' calc_local_moran_raster(rast, w)
 calc_local_moran_raster <- function(rast, window){
-  if(class(rast)[[1]] == "RasterLayer"){
+  if(inherits(rast,"RasterLayer")){
     mat <- raster::as.matrix(rast)
-  }else if (class(rast)[[1]] == "matrix"){
+  }else if (inherits(rast,"matrix")){
     mat <- rast
   }else{
     stop("rast parameter must be on of matrix or RasterLayer")
   }
-  if(class(window)[[1]] == "matrix"){
+  if(inherits(window,"matrix")){
     window <- window
-  }else if (class(window)[[1]] == "numeric"){
-    w <- 1+2*window
+  }else if (inherits(window,"numeric")){
+    w <- 1+2*inherits
     window <- matrix(1, nrow = w, ncol = w)
     window[ceiling(w/2),ceiling(w/2)] <- 0
   }else{
@@ -787,7 +791,7 @@ calc_local_moran_raster <- function(rast, window){
   }
   vals <- local_moranI_matrix_window(mat, window)
 
-  if(class(rast)[[1]] == "RasterLayer"){
+  if(inherits(rast,"RasterLayer")){
     raster::values(rast) <- vals
     return(rast)
   }else{

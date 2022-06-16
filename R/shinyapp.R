@@ -3,6 +3,7 @@
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 # the variables used in the shiny environment must be declared as globalVariables
+# nocov start
 globalVariables(c("spatial4326", "mapfun", "variables", "belongings", "n", "mymap",
                   "dataset", "base_violinplots", "dark", "light", "uncertainMap",
                   "base_boxplots","radarchart", 'rasterMode', "object","shiny_data"
@@ -103,12 +104,12 @@ sp_clust_explorer <- function(object = NULL, spatial = NULL, membership = NULL, 
   ok_sp <- c("SpatialPolygonsDataFrame", "SpatialPointsDataFrame","SpatialLinesDataFrame")
   if(is.null(object) == FALSE){
     if(object$isRaster == FALSE){
-      if(class(spatial) %in% ok_sp == FALSE){
+      if(inherits(spatial, ok_sp)  == FALSE){
         stop('spatial must be one of : c("SpatialPolygonsDataFrame", "SpatialPointsDataFrame","SpatialLinesDataFrame") because object was not created with rasters')
       }
     }
   }else{
-    if(class(spatial) %in% ok_sp == FALSE){
+    if(inherits(spatial, ok_sp)  == FALSE){
       stop('spatial must be one of : c("SpatialPolygonsDataFrame", "SpatialPointsDataFrame","SpatialLinesDataFrame")')
     }
   }
@@ -232,7 +233,7 @@ sp_clust_explorer <- function(object = NULL, spatial = NULL, membership = NULL, 
     addProviderTiles(leaflet::providers$Stamen.TonerBackground, group = "Toner Lite", layerId = "back1") %>%
     addProviderTiles(leaflet::providers$OpenStreetMap, group = "Open Street Map", layerId = "back2")
 
-  if(class(spatial)[[1]] == "SpatialPolygonsDataFrame"){
+  if(inherits(spatial,"SpatialPolygonsDataFrame")){
     mapfun <- function(map, data, weight, group, color, fillColor, layerId, ...){
       map %>% addPolygons(
         data = data,
@@ -244,9 +245,9 @@ sp_clust_explorer <- function(object = NULL, spatial = NULL, membership = NULL, 
         ...
       )
     }
-  }else if (class(spatial)[[1]] == "SpatialPointsDataFrame"){
+  }else if (inherits(spatial,"SpatialPointsDataFrame")){
     mapfun <- addCircles
-  }else if (class(spatial)[[1]] == "SpatialLinesDataFrame"){
+  }else if (inherits(spatial,"SpatialLinesDataFrame")){
     mapfun <- function(map, data, weight, group, color, fillColor, layerId, ...){
       if(is.null(fillColor)){
         fillColor <- "red"
@@ -451,5 +452,5 @@ sp_clust_explorer <- function(object = NULL, spatial = NULL, membership = NULL, 
 
   shiny::runApp(appDir, display.mode = "normal",port = 8100)
 }
-
+# nocov end
 

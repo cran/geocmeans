@@ -32,7 +32,7 @@ names(dataset) <- names(Arcachon)
 
 ## ----message=FALSE, warning=FALSE, eval=FALSE---------------------------------
 #  # finding an appropriate k and m values (using a multicore plan)
-#  future::plan(future::multiprocess(workers = 6))
+#  future::plan(future::multisession(workers = 6))
 #  FCMvalues <- select_parameters.mc(algo = "FCM", data = dataset,
 #                                 k = 5:10, m = seq(1.1,2,0.1), spconsist = FALSE,
 #                                 indices = c("XieBeni.index", "Explained.inertia",
@@ -119,7 +119,7 @@ w2 <- matrix(1, nrow = 5, ncol = 5)
 w3 <- matrix(1, nrow = 7, ncol = 7)
 
 ## ----message=FALSE, warning=FALSE, eval = FALSE-------------------------------
-#  future::plan(future::multiprocess(workers = 6))
+#  future::plan(future::multisession(workers = 6))
 #  SGFCMvalues <- select_parameters.mc(algo = "SGFCM", data = dataset, k = 7, m = 1.5,
 #                               beta = 0.5, alpha = seq(0.5,2,0.1),
 #                               window = list(w1,w2,w3),

@@ -34,14 +34,14 @@
 #' result <- SFCMeans(dataset, Wqueen,k = 5, m = 1.5, alpha = 1.5, standardize = TRUE)
 #' MyMaps <- mapClusters(LyonIris, result$Belongings)
 #' }
-mapClusters <- function(geodata = NULL, object, undecided = NULL) {
+mapClusters <- function(geodata = NULL, object, undecided = NULL) {# nocov start
 
-    cls <- class(object)[[1]]
+    #cls <- class(object)[[1]]
     isRaster <- FALSE
-    if(cls == "FCMres"){
+    if(inherits(object,"FCMres")){
         belongmatrix <- object$Belongings
         isRaster <- object$isRaster
-    }else if(class(object)[[1]] == "matrix"){
+    }else if(inherits(object,"matrix")){
         belongmatrix <- object
     }else{
         stop("object must be one of matrix of FCMres")
@@ -51,11 +51,11 @@ mapClusters <- function(geodata = NULL, object, undecided = NULL) {
         return(mapRasters(object, undecided))
     }else{
         geodata$OID <- as.character(1:nrow(geodata@data))
-        if(class(geodata)[[1]]=="SpatialPolygonsDataFrame"){
+        if(inherits(geodata,"SpatialPolygonsDataFrame")){
             return(mapPolygons(geodata, belongmatrix, undecided))
-        }else if(class(geodata)[[1]]=="SpatialPointsDataFrame"){
+        }else if(inherits(geodata,"SpatialPointsDataFrame")){
             return(mapPoints(geodata, belongmatrix, undecided))
-        }else if(class(geodata)[[1]]=="SpatialLinesDataFrame"){
+        }else if(inherits(geodata,"SpatialLinesDataFrame")){
             return(mapLines(geodata, belongmatrix, undecided))
         }else {
             stop("The object passed in geodata argument is not supported.
@@ -583,14 +583,14 @@ uncertaintyMap <- function(geodata, belongmatrix, njit = 150, radius = NULL, col
 
     geodata$tmpOID <- 1:nrow(geodata)
     groups <- 1:ncol(belongmatrix)
-    cls <- class(geodata)[[1]]
+    #cls <- class(geodata)[[1]]
 
-    if(cls=="SpatialPolygonsDataFrame"){
+    if(inherits(geodata,"SpatialPolygonsDataFrame")){
         geodata$area <- rgeos::gArea(geodata, byid = TRUE)
 
-    }else if(cls=="SpatialLinesDataFrame"){
+    }else if(inherits(geodata,"SpatialLinesDataFrame")){
         geodata$area <- rgeos::gLength(geodata, byid = TRUE)
-    }else if(cls=="SpatialPointsDataFrame"){
+    }else if(inherits(geodata,"SpatialPointsDataFrame")){
         geodata$area <- 1
         coords <- sp::coordinates(geodata)
         geodata$X <- coords[,1]
@@ -609,7 +609,7 @@ uncertaintyMap <- function(geodata, belongmatrix, njit = 150, radius = NULL, col
         belong <- belongmatrix[i,]
         poly <- geodata[i,]
 
-        if(cls != "SpatialPointsDataFrame"){
+        if(inherits(geodata,"SpatialPointsDataFrame")==FALSE){
             n <- round(poly$area*rt)
             if(n < 10){
                 n <-10
@@ -655,7 +655,7 @@ uncertaintyMap <- function(geodata, belongmatrix, njit = 150, radius = NULL, col
             axis.text = ggplot2::element_blank(),
             axis.ticks = ggplot2::element_blank()
         )
-    if(cls == "SpatialPolygonsDataFrame"){
+    if(inherits(geodata,"SpatialPolygonsDataFrame")){
         FortiData <- ggplot2::fortify(geodata, region = "tmpOID")
         uncertain_map <- uncertain_map +
             ggplot2::geom_polygon(data = FortiData, mapping = ggplot2::aes_string(x = "long",
@@ -666,7 +666,7 @@ uncertaintyMap <- function(geodata, belongmatrix, njit = 150, radius = NULL, col
 
     return(uncertain_map)
 
-}
+} # nocov end
 
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -854,11 +854,11 @@ select_parameters <- function(algo,data,k,m,alpha = NA, beta = NA, nblistw=NULL,
         stop("one of spconsist and classidx must be TRUE")
     }
 
-    if(class(nblistw)[[1]]!="list"){
+    if(inherits(nblistw,"list") == FALSE){
         nblistw <- list(nblistw)
     }
 
-    if(class(window)[[1]] != "list"){
+    if(inherits(window,"list") == FALSE ){
         window <- list(window)
     }
     if(is.null(indices)){
@@ -950,7 +950,7 @@ selectParameters <- select_parameters
 #' dataset <- LyonIris@data[AnalysisFields]
 #' queen <- spdep::poly2nb(LyonIris,queen=TRUE)
 #' Wqueen <- spdep::nb2listw(queen,style="W")
-#' future::plan(future::multiprocess(workers=2))
+#' future::plan(future::multisession(workers=2))
 #' #set spconsist to TRUE to calculate the spatial consistency indicator
 #' #FALSE here to reduce the time during package check
 #' values <- select_parameters.mc("SFCM", dataset, k = 5, m = seq(1,2.5,0.1),
@@ -967,11 +967,11 @@ select_parameters.mc <- function(algo,data,k,m,alpha = NA, beta = NA, nblistw=NU
         stop("one of spconsist and classidx must be TRUE")
     }
 
-    if(class(nblistw)[[1]]!="list"){
+    if(inherits(nblistw, "list")== FALSE){
         nblistw <- list(nblistw)
     }
 
-    if(class(window)[[1]] != "list"){
+    if(inherits(window, "list") == FALSE ){
         window <- list(window)
     }
     if(is.null(indices)){
@@ -1026,7 +1026,7 @@ select_parameters.mc <- function(algo,data,k,m,alpha = NA, beta = NA, nblistw=NU
 #' dataset <- LyonIris@data[AnalysisFields]
 #' queen <- spdep::poly2nb(LyonIris,queen=TRUE)
 #' Wqueen <- spdep::nb2listw(queen,style="W")
-#' future::plan(future::multiprocess(workers=2))
+#' future::plan(future::multisession(workers=2))
 #' #set spconsist to TRUE to calculate the spatial consistency indicator
 #' #FALSE here to reduce the time during package check
 #' values <- select_parameters.mc("SFCM", dataset, k = 5, m = seq(1,2.5,0.1),
@@ -1052,6 +1052,10 @@ selectParameters.mc <- select_parameters.mc
 #' @param data A dataframe with numeric columns
 #' @param listw A nb object from spdep
 #' @param style A letter indicating the weighting scheme (see spdep doc)
+#' @param mindist A minimum value for distance between two observations. If two
+#' neighbours have exactly the same values, then the euclidean distance between
+#' them is 0, leading to an infinite spatial weight. In that case, the minimum
+#' distance is used instead of 0.
 #'
 #' @return A listw object (spdep like)
 #' @export
@@ -1063,12 +1067,19 @@ selectParameters.mc <- select_parameters.mc
 #' queen <- spdep::poly2nb(LyonIris,queen=TRUE)
 #' Wqueen <- spdep::nb2listw(queen,style="W")
 #' Wqueen2 <- adjustSpatialWeights(dataset,queen,style="C")
-adjustSpatialWeights <- function(data,listw,style){
+adjustSpatialWeights <- function(data,listw,style, mindist = 0.00000000001){
     data <- as.matrix(data)
     new_weights <- lapply(1:nrow(data),function(i){
         row <- data[i,]
         neighbours <- data[listw[[i]],]
-        dists <- 1/calcEuclideanDistance2(neighbours,row)
+        dists <- calcEuclideanDistance2(neighbours,row)
+        err <- dists == 0
+        if(any(err)){
+            dists[err] <- mindist
+            warning("Some observartions have exactly the same values as one of their neighbours, leading to
+                    an euclidean distance of 0 and an infinite weight. The mindist value is applied instead")
+        }
+        indists <- 1/dists
         weights <- dists / sum(dists)
         return(weights)
     })
@@ -1083,7 +1094,8 @@ adjustSpatialWeights <- function(data,listw,style){
 
 #' @title Convert categories to membership matrix
 #'
-#' @description Function to convert a character vector to a membership matrix (binary matrix)
+#' @description Function to convert a character vector to a membership matrix (binary matrix).
+#' The columns of the matrix are ordered with the order function.
 #'
 #' @param categories A vector with the categories of each observation
 #'
@@ -1091,10 +1103,12 @@ adjustSpatialWeights <- function(data,listw,style){
 #' @export
 cat_to_belongings <- function(categories){
     cats <- unique(categories)
+    cats <- cats[order(cats)]
     cols <- lapply(cats, function(i){
         return (ifelse(categories == i, 1, 0))
     })
     mat <- do.call(cbind, cols)
+    colnames(mat) <- cats
     return(mat)
 }
 
