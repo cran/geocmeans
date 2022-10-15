@@ -17,8 +17,7 @@ sp_clust_explorer(
 \item{object}{A FCMres object, typically obtained from functions CMeans,
 GCMeans, SFCMeans, SGFCMeans}
 
-\item{spatial}{A spatial object (SpatialPointsDataFrame, SpatialPolygonsDataFrame or
-SpatialLinesDataFrame) used to map the observations. Only needed if object was not created
+\item{spatial}{A feature collection (sf) used to map the observations. Only needed if object was not created
 from rasters.}
 
 \item{membership}{A matrix or a dataframe representing the membership values
@@ -45,7 +44,7 @@ AnalysisFields <-c("Lden","NO2","PM25","VegHautPrt","Pct0_14",
                    "Pct_65","Pct_Img","TxChom1564","Pct_brevet","NivVieMed")
 
 #rescaling the columns
-Data <- LyonIris@data[AnalysisFields]
+Data <- sf::st_drop_geometry(LyonIris[AnalysisFields])
 for (Col in names(Data)){
   Data[[Col]] <- as.numeric(scale(Data[[Col]]))
 }

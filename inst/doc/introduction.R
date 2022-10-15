@@ -9,6 +9,7 @@ library(ggpubr)
 library(dplyr)
 library(viridis)
 library(spdep)
+library(tmap)
 
 data(LyonIris)
 
@@ -17,14 +18,11 @@ AnalysisFields <-c("Lden","NO2","PM25","VegHautPrt","Pct0_14",
                    "Pct_65","Pct_Img","TxChom1564","Pct_brevet","NivVieMed")
 
 # rescaling the columns
-Data <- LyonIris@data[AnalysisFields]
+Data <- sf::st_drop_geometry(LyonIris[AnalysisFields])
 for (Col in names(Data)){
   Data[[Col]] <- scale(Data[[Col]])
 }
 
-# preparing some elements for further mapping
-LyonIris$OID <- as.character(1:nrow(LyonIris))
-FortiData <- ggplot2::fortify(LyonIris,region="OID")
 
 ## ----include=FALSE------------------------------------------------------------
 # loading the pre-calculated results
@@ -54,19 +52,13 @@ KMeanClust <-  kmeans(Data,centers=4,iter.max = 150)
 LyonIris$Cluster <-paste("cluster",KMeanClust$cluster,sep="_")
 
 # mapping the groups
-DFmapping <- merge(FortiData,LyonIris,by.x="id",by.y="OID")
-
-ggplot(data=DFmapping)+
-  geom_polygon(aes(x=long,y=lat,group=group,fill=Cluster),color=rgb(0,0,0,0))+
-  coord_fixed(ratio = 1)+
-  scale_fill_manual(name="Cluster",values = c("cluster_1"="palegreen3",
+tm_shape(LyonIris) + 
+  tm_fill("Cluster", palette = c("cluster_1"="palegreen3",
                                  "cluster_2"="firebrick",
                                  "cluster_3"="lightyellow2",
-                                 "cluster_4"="steelblue"))+
-  theme( axis.title = ggplot2::element_blank(),
-    axis.text = ggplot2::element_blank(),
-    axis.ticks = ggplot2::element_blank()
-    )
+                                 "cluster_4"="steelblue")) +
+  tm_borders("black") +
+  tm_layout(legend.outside = TRUE, frame = FALSE)
 
 
 ## ----warning=FALSE------------------------------------------------------------
@@ -99,24 +91,23 @@ knitr::kable(df,
 cmeansMaps<- mapClusters(LyonIris,Cmean$Belongings,undecided = 0.45)
 GcmeansMaps<- mapClusters(LyonIris,GCmean$Belongings,undecided = 0.45)
 
-ggarrange(cmeansMaps$ProbaMaps[[1]],GcmeansMaps$ProbaMaps[[1]], 
-          nrow = 1, ncol = 2, common.legend = TRUE, legend = "bottom")
+tmap_arrange(cmeansMaps$ProbaMaps[[1]],GcmeansMaps$ProbaMaps[[1]], nrow = 1, ncol = 2)
 
 ## ----warning=FALSE, fig.cap = "Probability of belonging to cluster 2", out.width="80%", fig.pos="H", fig.align="center"----
-ggarrange(cmeansMaps$ProbaMaps[[2]],GcmeansMaps$ProbaMaps[[2]], 
-          nrow = 1, ncol = 2, common.legend = TRUE, legend = "bottom")
+tmap_arrange(cmeansMaps$ProbaMaps[[2]],GcmeansMaps$ProbaMaps[[2]], 
+          nrow = 1, ncol = 2)
 
 ## ----warning=FALSE, fig.cap = "Probability of belonging to cluster 3", out.width="80%", fig.pos="H", fig.align="center"----
-ggarrange(cmeansMaps$ProbaMaps[[3]],GcmeansMaps$ProbaMaps[[3]], 
-          nrow = 1, ncol = 2, common.legend = TRUE, legend = "bottom")
+tmap_arrange(cmeansMaps$ProbaMaps[[3]],GcmeansMaps$ProbaMaps[[3]], 
+          nrow = 1, ncol = 2)
 
 ## ----warning=FALSE, fig.cap = "Probability of belonging to cluster 4", out.width="80%", fig.pos="H", fig.align="center"----
-ggarrange(cmeansMaps$ProbaMaps[[4]],GcmeansMaps$ProbaMaps[[4]], 
-          nrow = 1, ncol = 2, common.legend = TRUE, legend = "bottom")
+tmap_arrange(cmeansMaps$ProbaMaps[[4]],GcmeansMaps$ProbaMaps[[4]], 
+          nrow = 1, ncol = 2)
 
 ## ----warning=FALSE, fig.cap = "Most likely clusters and undecided units", out.width="80%", fig.pos="H", fig.align="center"----
-ggarrange(cmeansMaps$ClusterPlot,GcmeansMaps$ClusterPlot,
-          nrow = 1, ncol = 2, common.legend = TRUE, legend = "bottom")
+tmap_arrange(cmeansMaps$ClusterPlot,GcmeansMaps$ClusterPlot,
+          nrow = 1, ncol = 2)
 
 ## ----message=FALSE, warning=FALSE---------------------------------------------
 library(spdep)
@@ -210,24 +201,24 @@ knitr::kable(df,digits = 3,col.names = c("SFCM","SGFCM"))
 SFCMMaps <- mapClusters(geodata = LyonIris, object = SFCM$Belongings,undecided = 0.45)
 SGFCMMaps <- mapClusters(geodata = LyonIris, object = SGFCM$Belongings,undecided = 0.45)
 
-ggarrange(SFCMMaps$ProbaMaps[[1]],SGFCMMaps$ProbaMaps[[1]], nrow = 1, ncol = 2,
-          common.legend = TRUE, legend = "bottom")
+tmap_arrange(SFCMMaps$ProbaMaps[[1]],SGFCMMaps$ProbaMaps[[1]],
+             nrow = 1, ncol = 2)
 
 ## ----warning=FALSE, fig.cap = "Probability of belonging to cluster 2", out.width="80%", fig.pos="H", fig.align="center"----
-ggarrange(SFCMMaps$ProbaMaps[[2]],SGFCMMaps$ProbaMaps[[2]], nrow = 1, ncol = 2,
-          common.legend = TRUE, legend = "bottom")
+tmap_arrange(SFCMMaps$ProbaMaps[[2]],SGFCMMaps$ProbaMaps[[2]],
+             nrow = 1, ncol = 2)
 
 ## ----warning=FALSE, fig.cap = "Probability of belonging to cluster 3", out.width="80%", fig.pos="H", fig.align="center"----
-ggarrange(SFCMMaps$ProbaMaps[[3]],SGFCMMaps$ProbaMaps[[3]], nrow = 1, ncol = 2,
-          common.legend = TRUE, legend = "bottom")
+tmap_arrange(SFCMMaps$ProbaMaps[[3]],SGFCMMaps$ProbaMaps[[3]],
+             nrow = 1, ncol = 2)
 
 ## ----warning=FALSE, fig.cap = "Probability of belonging to cluster 4", out.width="80%"----
-ggarrange(SFCMMaps$ProbaMaps[[4]],SGFCMMaps$ProbaMaps[[4]], nrow = 1, ncol = 2,
-          common.legend = TRUE, legend = "bottom")
+tmap_arrange(SFCMMaps$ProbaMaps[[4]],SGFCMMaps$ProbaMaps[[4]],
+             nrow = 1, ncol = 2)
 
 ## ----warning=FALSE, fig.cap = "Most likely cluster and undecided units", out.width="80%", fig.pos="H", fig.align="center"----
-ggarrange(SFCMMaps$ClusterPlot,SGFCMMaps$ClusterPlot, nrow = 1, ncol = 2,
-          common.legend = TRUE, legend = "bottom")
+tmap_arrange(SFCMMaps$ClusterPlot,SGFCMMaps$ClusterPlot,
+             nrow = 1, ncol = 2)
 
 ## ----warning=FALSE------------------------------------------------------------
 spdiag_1 <- spatialDiag(Cmean$Belongings, nblistw = WMat, nrep=250)
@@ -259,51 +250,46 @@ LyonIris$FinalCluster <- ifelse(Undecided=="Undecided",
                                 "Undecided",paste("cluster",Undecided,sep="_"))
 
 # mapping the groups
-DFmapping <- merge(FortiData,LyonIris,by.x="id",by.y="OID")
-
-ggplot(data=DFmapping)+
-  geom_polygon(aes(x=long,y=lat,group=group,fill=FinalCluster),color=rgb(0,0,0,0))+
-  coord_fixed(ratio = 1)+
-  scale_fill_manual(name="FinalCluster",values = c("cluster_V1"="palegreen3",
+tm_shape(LyonIris) + 
+  tm_fill("FinalCluster", palette = c("cluster_V1"="palegreen3",
                                  "cluster_V2"="firebrick",
                                  "cluster_V3"="lightyellow2",
                                  "cluster_V4"="steelblue",
                                  "cluster_V5"="pink",
-                                 "Undecided"=rgb(0,0,0,0.4)))+
-  theme( axis.title = element_blank(),
-    axis.text = element_blank(),
-    axis.ticks = element_blank()
-    )
+                                 "Undecided"=rgb(0,0,0,0.4))) + 
+  tm_borders("black") + 
+  tm_layout(frame = FALSE, legend.outside = TRUE)
 
-## ----warning=FALSE------------------------------------------------------------
-colors <- c("palegreen3","firebrick","lightyellow2","steelblue","pink")
-uncertaintyMap(LyonIris, SGFCM$Belongings, color = colors)
+
+## ----warning=FALSE, eval=FALSE------------------------------------------------
+#  colors <- c("palegreen3","firebrick","lightyellow2","steelblue","pink")
+#  uncertaintyMap(LyonIris, SGFCM$Belongings, color = colors)
+
+## ----echo=FALSE, warning=FALSE------------------------------------------------
+uncertainMap
 
 ## ----warning=FALSE------------------------------------------------------------
 LyonIris$entropyidx  <- calcUncertaintyIndex(SGFCM$Belongings)
 
 # mapping the uncertainty
-DFmapping <- merge(FortiData,LyonIris,by.x="id",by.y="OID")
+tm_shape(LyonIris) + 
+  tm_fill("entropyidx", palette = "Greys", style = "cont") + 
+  tm_borders("black") + 
+  tm_layout(frame = FALSE, legend.outside = TRUE)
 
-ggplot(data=DFmapping)+
-  geom_polygon(aes(x=long,y=lat,group=group,fill=entropyidx),color=rgb(0,0,0,0))+
-  coord_fixed(ratio = 1)+
-  labs(title = "Uncertainty evaluation", fill = "entropy index") +
-  theme(axis.title = element_blank(),
-    axis.text = element_blank(),
-    axis.ticks = element_blank()
-    )
 
 ## ----warning=FALSE------------------------------------------------------------
-summarizeClusters(LyonIris@data[AnalysisFields],belongmatrix = SGFCM$Belongings,
+Data <- sf::st_drop_geometry(LyonIris[AnalysisFields])
+summarizeClusters(Data,
+                  belongmatrix = SGFCM$Belongings,
                   weighted = TRUE, dec = 3)
 # equivalent to : 
-# summary(SGFCM, LyonIris@data[AnalysisFields])
+# summary(SGFCM, Data)
 
 ## ----warning=FALSE, eval = FALSE----------------------------------------------
-#  spiderPlots(LyonIris@data[AnalysisFields], SGFCM$Belongings,
+#  spiderPlots(Data, SGFCM$Belongings,
 #              chartcolors = c("darkorange3","grey4","darkgreen","royalblue"))
-#  violinPlots(LyonIris@data[AnalysisFields], SGFCM$Groups)
+#  violinPlots(Data, SGFCM$Groups)
 
 ## ----warning=FALSE, eval = FALSE----------------------------------------------
 #  bootvalues <- boot_group_validation(SGFCM, nsim = 1000, maxiter = 1000,
