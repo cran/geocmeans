@@ -78,7 +78,7 @@ FCMres <- function(obj){
 
     #step1 : prepare the regular dataset
     datamatrix <- do.call(cbind,lapply(obj$Data, function(band){
-      raster::values(band)
+      terra::values(band, mat = FALSE)
     }))
 
     #step2 : only keep the non-missing values
@@ -94,7 +94,7 @@ FCMres <- function(obj){
     }
     #step3 : set up the membership matrix
     belongmat <- do.call(cbind,lapply(obj$rasters, function(band){
-      raster::values(band)
+      terra::values(band, mat = FALSE)
     }))
     belongmat <- belongmat[missing_pxl,]
     obj$Belongings <- belongmat
@@ -104,10 +104,10 @@ FCMres <- function(obj){
     names(old_raster) <- paste("group",1:length(old_raster))
 
     rst2 <- old_raster[[1]]
-    vec <- rep(NA,times = raster::ncell(rst2))
+    vec <- rep(NA,times = terra::ncell(rst2))
     DF <- as.data.frame(obj$Belongings)
     vec[obj$missing] <- max.col(DF, ties.method = "first")
-    raster::values(rst2) <- vec
+    terra::values(rst2) <- vec
     old_raster[["Groups"]] <- rst2
     obj$rasters <- old_raster
 
@@ -127,8 +127,9 @@ FCMres <- function(obj){
   }
 
   # A quick check of the membership matrix
-  test <- round(rowSums(obj$Belongings),8) != 1
-  if(any(test)){
+  test1 <- any(round(rowSums(obj$Belongings),8) != 1)
+  test2 <- is.null(obj$noise_cluster)
+  if(test1 & test2){
     warning("some rows in the membership matrix does not sum up to 1... This should be checked")
   }
 
@@ -411,7 +412,7 @@ summary.FCMres <- function(object, data = NULL, weighted = TRUE, dec = 3, silent
 predict_membership <- function(object, new_data, nblistw = NULL, window = NULL, standardize = TRUE, ...){
 
   if(object$algo %in% c("FCM", "GFCM", "SFCM", "SGFCM") == FALSE){
-    stop('pred can only be performed for FCMres object
+    stop('prediction can only be performed for FCMres object
          if algo is one of "FCM", "GFCM", "SFCM", "SGFCM"')
   }
 
@@ -425,7 +426,7 @@ predict_membership <- function(object, new_data, nblistw = NULL, window = NULL, 
 
     old_data <- new_data
     new_data_tot <- do.call(cbind,lapply(new_data, function(rast){
-      return(raster::values(rast))
+      return(terra::values(rast, mat = FALSE))
     }))
     missing <- complete.cases(new_data_tot)
     new_data <- new_data_tot[missing,]
@@ -463,44 +464,108 @@ predict_membership <- function(object, new_data, nblistw = NULL, window = NULL, 
       }
 
       wdata_total <- do.call(cbind,lapply(dataset, function(band){
-        wraster <- focal(band, window, fun, na.rm = TRUE, pad = TRUE)
-        return(raster::values(wraster))
+        wraster <- terra::focal(band, window, fun, na.rm = TRUE, pad = TRUE)
+        return(terra::values(wraster, mat = FALSE))
       }))
       wdata <- wdata_total[missing,]
     }
 
   }
+  noise_cluster <- is.numeric(results$noise_cluster)
+  if(results$robust == FALSE){
+    sigmas <- rep(1, nrow(results$Centers))
+    wsigmas <- rep(1, nrow(results$Centers))
+  }else{
+    sigmas <- calcRobustSigmas(data = as.matrix(new_data),
+                               belongmatrix = results$Belongings,
+                               centers = as.matrix(results$Centers),
+                               m = results$m
+                               )
+    if(results$algo %in% c("SFCM", "SGFCM")){
+      print("hello there !")
+      wsigmas <- calcRobustSigmas(data = as.matrix(wdata),
+                                  belongmatrix = results$Belongings,
+                                  centers = as.matrix(results$Centers),
+                                  m = results$m
+      )
+    }
+  }
 
   ## selecting the appropriate function for prediction
   if(results$algo == "FCM"){
-    pred_values <- calcBelongMatrix(as.matrix(results$Centers), as.matrix(new_data),
-                                    m = results$m)
+    if(!noise_cluster){
+      pred_values <- calcBelongMatrix(as.matrix(results$Centers), as.matrix(new_data),
+                                      m = results$m, sigmas = sigmas)
+    }else{
+      pred_values <- calcBelongMatrixNoisy(as.matrix(results$Centers), as.matrix(new_data),
+                                      m = results$m, sigmas = sigmas,
+                                      delta = results$delta)
+    }
+
   }else if(results$algo == "GFCM"){
-    pred_values <- calcFGCMBelongMatrix(as.matrix(results$Centers),
-                                        as.matrix(new_data),
-                                        m = results$m, beta = results$beta)
+    if(!noise_cluster){
+      pred_values <- calcFGCMBelongMatrix(as.matrix(results$Centers),
+                                          as.matrix(new_data),
+                                          m = results$m, beta = results$beta,
+                                          sigmas = sigmas)
+    }else{
+      pred_values <- calcFGCMBelongMatrixNoisy(as.matrix(results$Centers),
+                                          as.matrix(new_data),
+                                          m = results$m, beta = results$beta,
+                                          delta = results$delta,
+                                          sigmas = sigmas)
+    }
+
   }else if(results$algo == "SFCM"){
-    pred_values <- calcSFCMBelongMatrix(as.matrix(results$Centers),
-                                        as.matrix(new_data),
-                                        wdata = as.matrix(wdata),
-                                        m = results$m, alpha = results$alpha)
+    if(!noise_cluster){
+      pred_values <- calcSFCMBelongMatrix(as.matrix(results$Centers),
+                                          as.matrix(new_data),
+                                          wdata = as.matrix(wdata),
+                                          m = results$m,
+                                          alpha = results$alpha,
+                                          wsigmas = wsigmas,
+                                          sigmas = sigmas)
+    }else{
+      pred_values <- calcSFCMBelongMatrixNoisy(as.matrix(results$Centers),
+                                          as.matrix(new_data),
+                                          wdata = as.matrix(wdata),
+                                          m = results$m, alpha = results$alpha,
+                                          delta = results$delta,
+                                          wsigmas = wsigmas,
+                                          sigmas = sigmas)
+    }
+
   }else if(results$algo == "SGFCM"){
-    pred_values <- calcSFGCMBelongMatrix(as.matrix(results$Centers),
-                                         as.matrix(new_data),
-                                         wdata = as.matrix(wdata),
-                                         m = results$m, alpha = results$alpha,
-                                         beta = results$beta)
+    if(!noise_cluster){
+      pred_values <- calcSFGCMBelongMatrix(as.matrix(results$Centers),
+                                           as.matrix(new_data),
+                                           wdata = as.matrix(wdata),
+                                           m = results$m, alpha = results$alpha,
+                                           beta = results$beta,
+                                           wsigmas = wsigmas,
+                                           sigmas = sigmas)
+    }else{
+      pred_values <- calcSFGCMBelongMatrixNoisy(as.matrix(results$Centers),
+                                           as.matrix(new_data),
+                                           wdata = as.matrix(wdata),
+                                           m = results$m, alpha = results$alpha,
+                                           beta = results$beta,
+                                           sigmas = sigmas,
+                                           wsigmas = wsigmas,
+                                           delta = results$delta)
+    }
+
   }
 
   if(results$isRaster == FALSE){
     return(pred_values)
   }else{
-    nc <- raster::ncell(new_data[[1]])
+    nc <- terra::ncell(new_data[[1]])
     rasters_membership <- lapply(1:ncol(pred_values), function(i){
       rast <- old_data[[1]]
       vec <- rep(NA,times = nc)
       vec[missing] <- pred_values[,i]
-      raster::values(rast) <- vec
+      terra::values(rast, mat = FALSE) <- vec
       return(rast)
     })
     names(rasters_membership) <- paste("group",1:ncol(pred_values), sep = "")

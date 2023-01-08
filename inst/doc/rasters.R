@@ -7,21 +7,22 @@ load(system.file("extdata", "results_vignette_raster.rda",
                            package = "geocmeans", mustWork = TRUE))
 
 ## ----message=FALSE, warning=FALSE, fig.width= 4-------------------------------
-library(raster)
 library(geocmeans)
 library(ggpubr)
 library(future)
 library(tmap)
 library(viridis)
 library(RColorBrewer)
+library(terra)
 
-data("Arcachon")
+Arcachon <- terra::rast(system.file("extdata/Littoral4_2154.tif", package = "geocmeans"))
+names(Arcachon) <- c("blue", "green", "red", "infrared", "SWIR1", "SWIR2")
 
 # show the pseudo-color image
-plotRGB(Arcachon, r = 3, g = 2, b = 1, stretch = "hist")
+terra::plotRGB(Arcachon, r = 3, g = 2, b = 1, stretch = "hist")
 
 ## ----message=FALSE, warning=FALSE---------------------------------------------
-# sonverting the RasterBrick to a simple list of RasterLayer
+# sonverting the RasterBrick to a simple list of SpatRaster
 dataset <- lapply(names(Arcachon), function(n){
   aband <- Arcachon[[n]]
   return(aband)
@@ -68,7 +69,7 @@ maps1$ProbaMaps[[2]] + theme(legend.position = "bottom")
 maps1$ProbaMaps[[5]] + theme(legend.position = "bottom")
 
 # plotting the most likely categories
-maps1$ClusterPlot + theme(legend.position = "bottom")
+maps1$ClusterPlot + theme(legend.position = "bottom") + scale_fill_brewer(palette = "Set2")
 
 ## ----message=FALSE, warning=FALSE, eval = FALSE-------------------------------
 #  GFCMvalues <- select_parameters.mc(algo = "GFCM", data = dataset,
@@ -110,7 +111,8 @@ maps2$ProbaMaps[[2]] + theme(legend.position = "bottom")
 maps2$ProbaMaps[[5]] + theme(legend.position = "bottom")
 
 # plotting the most likely categories
-maps2$ClusterPlot + theme(legend.position = "bottom")
+maps2$ClusterPlot + theme(legend.position = "bottom") +
+  scale_fill_brewer(palette = "Set2")
 
 
 ## ----message=FALSE, warning=FALSE---------------------------------------------
@@ -130,6 +132,13 @@ w3 <- matrix(1, nrow = 7, ncol = 7)
 #                                           "Negentropy.index", "Silhouette.index"))
 
 ## ----message=FALSE, warning=FALSE, fig.width = 5, fig.align='center'----------
+dict <- data.frame(
+  w = c(1,2,3),
+  window = c("3x3","5x5","7x7")
+)
+
+SGFCMvalues$window <- dict$window[match(SGFCMvalues$window,dict$w)]
+
 # showing the silhouette index
 ggplot(SGFCMvalues) + 
   geom_raster(aes(x = alpha, y = window, fill = Silhouette.index)) + 
@@ -171,7 +180,8 @@ maps3$ProbaMaps[[5]] + theme(legend.position = "bottom")
 
 
 # plotting the most likely categories
-maps3$ClusterPlot + theme(legend.position = "bottom")
+maps3$ClusterPlot + theme(legend.position = "bottom") + 
+  scale_fill_brewer(palette = "Set2")
 
 
 ## ----message=FALSE, warning=FALSE---------------------------------------------
@@ -196,31 +206,38 @@ diagGFCM <- spatialDiag(GFCM_result, window = matrix(1, nrow = 3, ncol = 3), nre
 knitr::kable(diagGFCM$MoranValues, digits = 3, row.names = FALSE)
 
 ## ----message=FALSE, warning=FALSE, fig.width = 6, fig.align = "center"--------
-# calculating the local Moran I values
-loc_moran3 <- calc_local_moran_raster(GFCM_result$rasters$group3,w1)
-loc_moran7 <- calc_local_moran_raster(GFCM_result$rasters$group7,w1)
+library(classInt)
 
-pal <- rev(brewer.pal(n = 9, name = "Spectral"))
+# calculating the local Moran I values
+loc_moran4 <- calc_local_moran_raster(GFCM_result$rasters$group4,w1)
+loc_moran5 <- calc_local_moran_raster(GFCM_result$rasters$group5,w1)
 
 # mapping the values
-tm_shape(loc_moran3) + 
-  tm_raster(palette = pal, style = "kmeans", n = 9, title = "Local Moran I") + 
-  tm_layout(legend.outside = TRUE, legend.outside.position = "right")
+cols <- rev(RColorBrewer::brewer.pal(n = 8, "Spectral"))
+vals <- terra::values(loc_moran4, mat = FALSE)
+limits <- classIntervals(vals,  n = 8, style = "kmeans") 
+plot(loc_moran4, col = cols, breaks = limits$brks)
 
-tm_shape(loc_moran7) + 
-  tm_raster(palette = pal, style = "kmeans", n = 9, title = "Local Moran I") + 
-  tm_layout(legend.outside = TRUE, legend.outside.position = "right")
+vals <- terra::values(loc_moran5, mat = FALSE)
+limits <- classIntervals(vals,  n = 8, style = "kmeans") 
+plot(loc_moran5, col = cols, breaks = limits$brks)
 
 
 ## ----message=FALSE, warning=FALSE, fig.width = 6, fig.align = "center"--------
-tm_shape(diagGFCM$Elsa) + 
-  tm_raster(palette = "Greys", style = "kmeans", n = 7, title = "Local ELSA") + 
-  tm_layout(legend.outside = TRUE, legend.outside.position = "right")
+
+cols <- RColorBrewer::brewer.pal(n = 7, "Greys")
+vals <- terra::values(diagGFCM$Elsa, mat = FALSE)
+limits <- classIntervals(vals[!is.na(vals)],  n = 7, style = "kmeans") 
+plot(diagGFCM$Elsa, col = cols, breaks = limits$brks)
+
 
 ## ----message=FALSE, warning=FALSE, fig.width = 6, fig.align = "center"--------
 fuzzy_elsa_rast <- calcFuzzyELSA(GFCM_result,window = matrix(1,nrow = 3, ncol = 3))
 
-tm_shape(fuzzy_elsa_rast) + 
-  tm_raster(palette = "Greys", style = "kmeans", n = 7, title = "Local fuzzy ELSA") + 
-  tm_layout(legend.outside = TRUE, legend.outside.position = "right")
+
+cols <- RColorBrewer::brewer.pal(n = 7, "Greys")
+vals <- terra::values(fuzzy_elsa_rast, mat = FALSE)
+limits <- classIntervals(vals[!is.na(vals)],  n = 7, style = "kmeans") 
+plot(fuzzy_elsa_rast, col = cols, breaks = limits$brks)
+
 

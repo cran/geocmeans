@@ -592,12 +592,16 @@ NumericVector Elsa_fuzzy_matrix_window(arma::fcube mats, arma::mat window, Numer
 //' @param data an arma cube of dimension nr,nc,ns
 //' @param memberships an arma cube of dimension nr, nc, ks
 //' @param a matrix representing the neighbouring of each pixel
+//' @param mindist A minimum value for distance between two observations. If two
+//'   neighbours have exactly the same values, then the euclidean distance
+//'   between them is 0, leading to an infinite spatial weight. In that case,
+//'   the minimum distance is used instead of 0.
 //' @return a double, the adjusted spatial inconsitency index
 //' @keywords internal
 //' @export
 //'
 // [[Rcpp::export]]
-double adj_spconsist_arr_window_globstd(arma::fcube data, arma::fcube memberships, arma::mat window){
+double adj_spconsist_arr_window_globstd(arma::fcube data, arma::fcube memberships, arma::mat window, double mindist = 1e-11){
   //determiner le centre de la window (width and height of window)
   int window_width = window.n_rows;
   int window_height = window.n_cols;
@@ -618,10 +622,11 @@ double adj_spconsist_arr_window_globstd(arma::fcube data, arma::fcube membership
   arma::fcube subcube_mem, subcube_dat;
   int L = data.n_slices;
   int K = memberships.n_slices;
-  double euc_dist;
+  double euc_dist, dij;
   double spconsist = 0;
 
   // **** first serie of iterations to get the overall spatial weight ****
+
   double tot_weight = 0;
   // iterating over each row
   for (r = 0; r < nr ; r++){
@@ -670,7 +675,13 @@ double adj_spconsist_arr_window_globstd(arma::fcube data, arma::fcube membership
             if(weight > 0){
               xj = subcube_dat.tube(i,j);
               if(!xj.has_nan()){
-                tot_weight += 1.0 / accu(arma::square(xi - xj));
+                dij = accu(arma::square(xi - xj));
+                if(dij > mindist){
+                  tot_weight += 1.0 / dij;
+                }else{
+                  tot_weight += 1.0 / mindist;
+                }
+
               }
             }
           }
@@ -736,7 +747,12 @@ double adj_spconsist_arr_window_globstd(arma::fcube data, arma::fcube membership
               xj = subcube_dat.tube(i,j);
               if(!xj.has_nan()){
                 mj = subcube_mem.tube(i,j);
-                dat_dists(counter) = 1.0 / accu(arma::square(xi - xj));
+                dij = accu(arma::square(xi - xj));
+                if(dij > 0){
+                  dat_dists(counter) = 1.0 / dij;
+                }else{
+                  dat_dists(counter) = 1.0 / mindist;
+                }
                 mem_dists(counter) = accu(arma::square(mi - mj));
               }else{
                 dat_dists(counter) = 0;
@@ -752,50 +768,3 @@ double adj_spconsist_arr_window_globstd(arma::fcube data, arma::fcube membership
   }
   return spconsist;
 }
-
-
-// mat1 <- rbind(
-//     c(0.1,0.5,0.3),
-//     c(0.8,0.1,0.1),
-//     c(0.7,0.8,0.1)
-// )
-// mat2 <- 1 - mat1
-//
-// dat1 <- rbind(
-//     c(1,2,3),
-//     c(4,5,6),
-//     c(1,2,3)
-//     )
-//
-// dat2 <- rbind(
-//       c(4,5,6),
-//       c(4,4,4),
-//       c(2,2,2)
-// )
-//
-// dat3 <- rbind(
-//       c(3,3,3),
-//       c(1,6,1),
-//       c(4,5,7)
-//   )
-//
-// dat_arr <- array(c(dat1,dat2,dat3),c(3,3,3))
-// dat_mem <- array(c(mat1,mat2),c(3,3,2))
-// window <- matrix(1,nrow = 3, ncol = 3)
-// window[2,2] <- 0
-// library(raster)
-// tiff_location <- system.file("extdata", "Littoral.tif",
-//                              package = "geocmeans", mustWork = TRUE)
-// full_raster <- brick(tiff_location)
-// dataset <- lapply(1:nbands(full_raster), function(i){
-//      aband <- raster(tiff_location, band = i)
-//      return(aband)
-// })
-// names(dataset) <- c("blue", "green", "red", "infrared", "SWIR1", "SWIR2")
-// FCM_result <- CMeans(dataset, k = 7, m = 1.7, standardize = TRUE, verbose = F, seed = 456, tol = 0.01)
-// mats <- lapply(FCM_result$rasters[1:FCM_result$k], raster::as.matrix)
-// arr <- array(do.call(c,mats), c(dim(mats[[1]]), length(mats)))
-// mats2 <- lapply(dataset, raster::as.matrix)
-// arr_dat <-  array(do.call(c,mats2), c(dim(mats2[[1]]), length(mats2)))
-// window <- matrix(1,nrow = 3, ncol = 3)
-// window[2,2] <- 0

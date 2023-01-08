@@ -7,7 +7,7 @@ library(tmap)
 library(dplyr)
 library(ggplot2)
 library(spdep)
-library(raster)
+library(terra)
 library(sf)
 
 data("LyonIris")
@@ -76,13 +76,14 @@ hclustres <- FCMres(list(
 #  sp_clust_explorer(hclustres, spatial = LyonIris)
 
 ## ----message=FALSE, warning=FALSE---------------------------------------------
-data("Arcachon")
+Arcachon <- terra::rast(system.file("extdata/Littoral4_2154.tif", package = "geocmeans"))
+names(Arcachon) <- c("blue", "green", "red", "infrared", "SWIR1", "SWIR2")
 
 # loading each raster as a column in a matrix
 # and scale each column
 all_data <- do.call(cbind, lapply(names(Arcachon), function(n){
   rast <- Arcachon[[n]]
-  return(raster::values(raster::scale(rast)))
+  return(terra::values(terra::scale(rast), mat = FALSE))
 }))
 
 # removing the rows with missing values
@@ -98,7 +99,7 @@ kmean7 <- kmeans(all_data, 7)
 # creating Data (do not forget the standardization)
 Data <- lapply(names(Arcachon), function(n){
   rast <- Arcachon[[n]]
-  return(raster::scale(rast))
+  return(terra::scale(rast))
 })
 names(Data) <- names(Arcachon)
 
@@ -107,12 +108,12 @@ ref_raster <- Arcachon[[1]]
 
 rasters <- lapply(1:7, function(i){
   # creating a vector with only 0 values
-  vals <- rep(0, ncell(ref_raster))
+  vals <- rep(0, terra::ncell(ref_raster))
   # filling it with values when the pixels are not NA
   vals[missing] <- ifelse(kmean7$cluster == i,1,0)
   # setting the values in a rasterLayer
   rast <- ref_raster
-  raster::values(rast) <- vals
+  terra::values(rast) <- vals
   return(rast)
 })
 

@@ -1,7 +1,8 @@
-#' social and environmental indicators for the Iris of the metropolitan region of Lyon (France)
+#' @title social and environmental indicators for the Iris of the metropolitan region of Lyon (France)
 #'
-#' A dataset containing social and environmental data for the
+#' @description A dataset containing social and environmental data for the
 #' Iris of Lyon (France)
+#' @name LyonIris
 #'
 #' @format A SpatialPolygonsDataFrame with 506 rows and 32 variables:
 #' \describe{
@@ -27,14 +28,16 @@
 "LyonIris"
 
 
-#' RasterLayer of the bay of Arcachon
+#' @title SpatRaster of the bay of Arcachon
 #'
-#' A Landsat 8 image of the bay of Arcachon (France), with a resolution of 30mx30m
+#' @description A Landsat 8 image of the bay of Arcachon (France), with a resolution of 30mx30m
 #' and 6 bands: blue, green, red, near infrared, shortwave infrared 1 and shortwave infrared 2.
 #' The dataset is saved as a Large RasterBrick with the package raster and has the
-#' following crs: EPSG:32630
+#' following crs: EPSG:32630. It is provided as a tiff file.
 #'
-#' @format A Large RasterBrick with 6 bands
+#' @name Arcachon
+#'
+#' @format A spaRast with 6 bands
 #' \describe{
 #'   \item{blue}{wavelength: 0.45-0.51}
 #'   \item{green}{wavelength: 0.53-0.59}
@@ -44,6 +47,19 @@
 #'   \item{shortwave infrared}{wavelength: 2.11-2.29}
 #' }
 #' @source \url{https://earthexplorer.usgs.gov/}
-"Arcachon"
+#'
+#' @examples
+#' # loading directly from file
+#' Arcachon <- terra::rast(system.file("extdata/Littoral4_2154.tif", package = "geocmeans"))
+#' names(Arcachon) <- c("blue", "green", "red", "infrared", "SWIR1", "SWIR2")
+#'
+#' # loading with the provided function
+#' Arcachon <- load_arcachon()
+#' @export
+load_arcachon <- function(){
+  Arcachon <- terra::rast(system.file("extdata/Littoral4_2154.tif", package = "geocmeans"))
+  names(Arcachon) <- c("blue", "green", "red", "infrared", "SWIR1", "SWIR2")
+  return(Arcachon)
+}
 
 

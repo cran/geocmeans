@@ -11,6 +11,8 @@ eval_parameters(
   nblistw = NULL,
   window = NULL,
   standardize = TRUE,
+  robust = FALSE,
+  noise_cluster = FALSE,
   spconsist = FALSE,
   classidx = TRUE,
   nrep = 30,
@@ -19,7 +21,8 @@ eval_parameters(
   maxiter,
   seed = NULL,
   init = "random",
-  verbose = TRUE
+  verbose = TRUE,
+  wrapped = FALSE
 )
 }
 \arguments{
@@ -71,6 +74,8 @@ indicates that random observations are used as centers. "kpp" use a distance bas
 resulting in more dispersed centers at the beginning. Both of them are heuristic.}
 
 \item{verbose}{A boolean indicating if a progressbar should be displayed}
+
+\item{wrapped}{A boolean indicating if the data passed is wrapped or not (see wrap function of terra)}
 }
 \value{
 a DataFrame containing for each combinations of parameters several clustering

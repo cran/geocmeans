@@ -102,9 +102,10 @@ mapRasters  <- function(object, undecided){
     # realisation des cartes de probabilites
     ProbaPlots <- lapply(1:ncol(object$Belongings), function(i) {
         rast <- object$rasters[[i]]
-        spdf <- as(rast, "SpatialPixelsDataFrame")
-        df <- as.data.frame(spdf)
-        colnames(df) <- c("value", "x", "y")
+        #spdf <- as(rast, "SpatialPixelsDataFrame")
+        #df <- as.data.frame(spdf)
+        df <- terra::as.data.frame(rast, xy = TRUE)
+        colnames(df) <- c("x", "y", "value")
 
         Plot <- ggplot2::ggplot(df) +
             ggplot2::geom_raster(ggplot2::aes_string(x="x", y="y", fill="value"), alpha=0.8) +
@@ -126,15 +127,16 @@ mapRasters  <- function(object, undecided){
     #finding for each pixel the max probability
     uncertain_vec <- undecidedUnits(object$Belongings, tol = undecided, out = "numeric")
     rast <- object$rasters[[1]]
-    vec <- rep(NA, times = raster::ncell(rast))
+    vec <- rep(NA, times = terra::ncell(rast))
     vec[object$missing] <- uncertain_vec
-    raster::values(rast) <- vec
+    terra::values(rast) <- vec
 
-    spdf <- as(rast, "SpatialPixelsDataFrame")
-    df <- as.data.frame(spdf)
-    colnames(df) <- c("value", "x", "y")
-    df$values <- as.character(df$value)
-    df$values <- ifelse(df$values == "-1", "undecided", paste("group", df$values, sep = " "))
+    #spdf <- as(rast, "SpatialPixelsDataFrame")
+    #df <- as.data.frame(spdf)
+    df <- terra::as.data.frame(rast, xy = TRUE)
+    colnames(df) <- c("x", "y","value")
+    df$value <- as.character(df$value)
+    df$value <- ifelse(df$value == "-1", "undecided", paste("group", df$value, sep = " "))
 
     colors <- RColorBrewer::brewer.pal(ncol(object$Belongings),"Set3")
     if("undecided" %in% df$values){
@@ -142,7 +144,7 @@ mapRasters  <- function(object, undecided){
     }
 
     ClusterMap <- ggplot2::ggplot(df) +
-        ggplot2::geom_raster(ggplot2::aes_string(x = "x", y = "y", fill = "values")) +
+        ggplot2::geom_raster(ggplot2::aes_string(x = "x", y = "y", fill = "value")) +
         ggplot2::scale_fill_discrete(type = colors) +
         ggplot2::coord_fixed(ratio = 1)+
         ggplot2::theme(
@@ -380,6 +382,7 @@ violinPlots <- function(data,groups){
 #' @return a barplot created with ggplot2
 #' @export
 #' @examples
+#' \dontrun{
 #' data(LyonIris)
 #' AnalysisFields <-c("Lden","NO2","PM25","VegHautPrt","Pct0_14","Pct_65","Pct_Img",
 #' "TxChom1564","Pct_brevet","NivVieMed")
@@ -388,6 +391,7 @@ violinPlots <- function(data,groups){
 #' Wqueen <- spdep::nb2listw(queen,style="W")
 #' result <- SFCMeans(dataset, Wqueen,k = 5, m = 1.5, alpha = 1.5, standardize = TRUE)
 #' barPlots(dataset, result$Belongings)
+#' }
 barPlots <- function(data,belongmatrix, ncol = 3, what = "mean"){
     datasummary <- summarizeClusters(data, belongmatrix)
     if (what == "mean"){
@@ -581,6 +585,7 @@ uncertaintyMap <- function(geodata, belongmatrix, njit = 150, radius = NULL, col
 #' indicates that random observations are used as centers. "kpp" use a distance based method
 #' resulting in more dispersed centers at the beginning. Both of them are heuristic.
 #' @param verbose A boolean indicating if a progressbar should be displayed
+#' @param wrapped A boolean indicating if the data passed is wrapped or not (see wrap function of terra)
 #' @return a DataFrame containing for each combinations of parameters several clustering
 #' quality indexes.
 #' @importFrom utils setTxtProgressBar txtProgressBar
@@ -588,16 +593,24 @@ uncertaintyMap <- function(geodata, belongmatrix, njit = 150, radius = NULL, col
 #' @examples
 #' #No example provided, this is an internal function
 eval_parameters <- function(algo, parameters, data, nblistw = NULL, window = NULL, standardize = TRUE,
+                            robust = FALSE, noise_cluster = FALSE,
                             spconsist = FALSE, classidx = TRUE, nrep = 30, indices = NULL,
-                            tol, maxiter, seed = NULL, init = "random", verbose = TRUE){
+                            tol, maxiter, seed = NULL, init = "random", verbose = TRUE,
+                            wrapped = FALSE){
+    if(wrapped){
+      data <- lapply(data, terra::unwrap)
+    }
+
     if(algo == "FCM"){
         exefun <- function(data,x, ...){
             return(CMeans(data, x$k, x$m, maxiter = maxiter, tol = tol, standardize = standardize,
+                          robust = robust, noise_cluster = noise_cluster, delta = x$delta,
                           verbose = FALSE, seed = seed, init = init))
         }
     }else if(algo == "GFCM"){
         exefun <- function(data,x,... ){
             return(GCMeans(data, x$k, x$m, x$beta, maxiter = maxiter, tol = tol, standardize = standardize,
+                           robust = robust, noise_cluster = noise_cluster, delta = x$delta,
                            verbose = FALSE, seed = seed, init = init))
         }
     }else if(algo == "SFCM"){
@@ -605,6 +618,7 @@ eval_parameters <- function(algo, parameters, data, nblistw = NULL, window = NUL
             dots <- list(...)
             return(SFCMeans(data, dots$lw, x$k, x$m, x$alpha, x$lag_method, window = dots$wd,
                             maxiter = maxiter, tol = tol, standardize = standardize,
+                            robust = robust, noise_cluster = noise_cluster, delta = x$delta,
                             verbose = FALSE, seed = seed, init = init))
         }
     }else if(algo == "SGFCM"){
@@ -612,6 +626,7 @@ eval_parameters <- function(algo, parameters, data, nblistw = NULL, window = NUL
             dots <- list(...)
             return(SGFCMeans(data, dots$lw, x$k, x$m, x$alpha, x$beta, x$lag_method, window = dots$wd,
                              maxiter = maxiter, tol = tol, standardize = standardize,
+                             robust = robust, noise_cluster = noise_cluster, delta = x$delta,
                              verbose = FALSE, seed = seed, init = init))
         }
     }else{
@@ -683,6 +698,9 @@ eval_parameters <- function(algo, parameters, data, nblistw = NULL, window = NUL
 #' and weighted according to the values of this matrix.
 #' @param window A list of windows to use to calculate neighbouring values if
 #' rasters are used.
+#' @param robust A boolean indicating if the "robust" version of the algorithm must be used (see details)
+#' @param noise_cluster A boolean indicatong if a noise cluster must be added to the solution (see details)
+#' @param delta A float giving the distance of the noise cluster to each observation
 #' @param standardize A boolean to specify if the variable must be centered and
 #'   reduce (default = True)
 #' @param spconsist A boolean indicating if the spatial consistency must be
@@ -723,7 +741,9 @@ eval_parameters <- function(algo, parameters, data, nblistw = NULL, window = NUL
 #' }
 select_parameters <- function(algo,data,k,m,alpha = NA, beta = NA, nblistw=NULL, lag_method="mean", window = NULL,
                               spconsist = TRUE, classidx = TRUE, nrep = 30, indices = NULL,
-                              standardize = TRUE, maxiter = 500, tol = 0.01,
+                              standardize = TRUE,
+                              robust = FALSE, noise_cluster = FALSE, delta = NA,
+                              maxiter = 500, tol = 0.01,
                               seed=NULL, init = "random", verbose = TRUE){
 
     if(spconsist==FALSE & classidx==FALSE){
@@ -741,12 +761,16 @@ select_parameters <- function(algo,data,k,m,alpha = NA, beta = NA, nblistw=NULL,
         indices <- c("Silhouette.index", "Partition.entropy", "Partition.coeff", "XieBeni.index", "FukuyamaSugeno.index", "Explained.inertia")
     }
 
-    allcombinaisons <- expand.grid(k=k,m=m,alpha=alpha,beta = beta,listsw=1:length(nblistw),lag_method=lag_method, window = 1:length(window))
+    allcombinaisons <- expand.grid(k=k,m=m,alpha=alpha,beta=beta,
+                                   listsw=1:length(nblistw),lag_method=lag_method,window = 1:length(window),
+                                   delta = delta
+                                   )
 
     print(paste("number of combinaisons to estimate : ",nrow(allcombinaisons)))
     dfIndices <- eval_parameters(algo, allcombinaisons, data, nblistw, window, standardize,
-        spconsist, classidx, nrep, indices,
-        tol, maxiter, seed, init = init, verbose = verbose)
+                                 robust, noise_cluster,
+                                 spconsist, classidx, nrep, indices,
+                                 tol, maxiter, seed, init = init, verbose = verbose)
     return(dfIndices)
 }
 
@@ -791,6 +815,9 @@ selectParameters <- select_parameters
 #' and weighted according to the values of this matrix.
 #' @param window A list of windows to use to calculate neighbouring values if
 #' rasters are used.
+#' @param robust A boolean indicating if the "robust" version of the algorithm must be used (see details)
+#' @param noise_cluster A boolean indicatong if a noise cluster must be added to the solution (see details)
+#' @param delta A float giving the distance of the noise cluster to each observation
 #' @param spconsist A boolean indicating if the spatial consistency must be
 #' calculated
 #' @param classidx A boolean indicating if the quality of classification
@@ -836,7 +863,9 @@ selectParameters <- select_parameters
 #'}
 select_parameters.mc <- function(algo,data,k,m,alpha = NA, beta = NA, nblistw=NULL, lag_method="mean", window = NULL,
                                  spconsist = TRUE, classidx = TRUE, nrep = 30, indices = NULL,
-                                 standardize = TRUE, maxiter = 500, tol = 0.01, chunk_size = 5,
+                                 standardize = TRUE,
+                                 robust = FALSE, noise_cluster = FALSE, delta = NA,
+                                 maxiter = 500, tol = 0.01, chunk_size = 5,
                                  seed=NULL, init = "random", verbose = TRUE){
 
     if(spconsist==FALSE & classidx==FALSE){
@@ -854,8 +883,8 @@ select_parameters.mc <- function(algo,data,k,m,alpha = NA, beta = NA, nblistw=NU
         indices <- c("Silhouette.index", "Partition.entropy", "Partition.coeff", "XieBeni.index", "FukuyamaSugeno.index", "Explained.inertia")
     }
 
-    allcombinaisons <- expand.grid(k=k,m=m,alpha=alpha,beta = beta,listsw=1:length(nblistw),lag_method=lag_method, window = 1:length(window))
-
+    allcombinaisons <- expand.grid(k=k,m=m,alpha=alpha,beta=beta,delta = delta,
+                                   listsw=1:length(nblistw),lag_method=lag_method, window = 1:length(window))
 
     if (verbose){
         print(paste("number of combinaisons to estimate : ",nrow(allcombinaisons)))
@@ -864,6 +893,17 @@ select_parameters.mc <- function(algo,data,k,m,alpha = NA, beta = NA, nblistw=NU
                                        each = chunk_size, length.out = nrow(allcombinaisons)))
 
     chunks <- lapply(chunks,function(x){return(allcombinaisons[x,])})
+
+    if(inherits(data, "data.frame") == FALSE){
+      ## NOTE HERE : the rasters from terra must be read here befond send to clusters...
+      dataw <- lapply(data, terra::wrap)
+      wrapped <- TRUE
+    }else{
+      dataw <- data
+      wrapped <- FALSE
+    }
+
+
     # step2 : starting the function
     iseq <- 1:length(chunks)
     if(verbose){
@@ -872,9 +912,10 @@ select_parameters.mc <- function(algo,data,k,m,alpha = NA, beta = NA, nblistw=NU
             values <- future.apply::future_lapply(iseq, function(i) {
                 sprintf(algo)
                 parameters <- chunks[[i]]
-                indices <- eval_parameters(algo, parameters, data, nblistw, window, standardize,
+                indices <- eval_parameters(algo, parameters, dataw, nblistw, window, standardize,
+                                           robust = robust, noise_cluster = noise_cluster,
                                            spconsist, classidx, nrep, indices,
-                                           tol, maxiter, init = init, verbose = FALSE)
+                                           tol, maxiter, init = init, verbose = FALSE, wrapped = wrapped)
                 p(sprintf("i=%g", i))
                 return(indices)
             }, future.seed = seed)
@@ -882,9 +923,10 @@ select_parameters.mc <- function(algo,data,k,m,alpha = NA, beta = NA, nblistw=NU
     }else{
         values <- future.apply::future_lapply(iseq, function(i) {
             parameters <- chunks[[i]]
-            indices <- eval_parameters(algo, parameters, data, nblistw, window, standardize,
+            indices <- eval_parameters(algo, parameters, dataw, nblistw, window, standardize,
+                                       robust = robust, noise_cluster = noise_cluster,
                                        spconsist, classidx, nrep, indices,
-                                       tol, maxiter, init = init, verbose = FALSE)
+                                       tol, maxiter, init = init, verbose = FALSE, wrapped = wrapped)
             return(indices)
         },future.seed = seed)
     }
