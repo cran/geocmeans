@@ -1,3 +1,8 @@
+# geocmeans 0.3.3
+
+Correcting minor bugs caused by the recent removing of rgdal from dependencies
+Updating to C++17 to match CRAN new requirements
+
 # geocmeans 0.3.2.9000
 
 Removing dependencies from rgdal and raster to move to terra.

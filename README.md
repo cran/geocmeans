@@ -8,7 +8,7 @@
 <!-- badges: start -->
 
 [![R-CMD-check](https://github.com/JeremyGelb/geocmeans/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/JeremyGelb/geocmeans/actions/workflows/R-CMD-check.yaml)
-[![](https://img.shields.io/badge/devel%20version-0.3.2-green.svg)](https://github.com/JeremyGelb/geocmeans)
+[![](https://img.shields.io/badge/devel%20version-0.3.3-green.svg)](https://github.com/JeremyGelb/geocmeans)
 [![](https://www.r-pkg.org/badges/version/geocmeans?color=blue)](https://cran.r-project.org/package=geocmeans)
 [![](http://cranlogs.r-pkg.org/badges/grand-total/geocmeans?color=blue)](https://cran.r-project.org/package=geocmeans)
 [![Codecov test
@@ -74,6 +74,10 @@ Four Fuzzy classification algorithms are proposed :
 
 Each function return a membership matrix, the data used for the
 classification (scaled if required) and the centers of the clusters.
+
+For each algorithm, it is possible to calculate a “robust version” and
+to add a noise group (used to catch outliers). See the parameters
+`robust` and `noise_cluser` in the documentation for more details.
 
 #### Parameter selections
 
@@ -180,5 +184,5 @@ By contributing to this project, you agree to abide by its terms.
 
 ## License
 
-`geocmeans` version 0.1.0 is licensed under [GPL2
+`geocmeans` version 0.3.2 is licensed under [GPL2
 License](https://github.com/JeremyGelb/geocmeans/blob/master/LICENSE.txt).

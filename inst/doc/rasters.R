@@ -22,7 +22,7 @@ names(Arcachon) <- c("blue", "green", "red", "infrared", "SWIR1", "SWIR2")
 terra::plotRGB(Arcachon, r = 3, g = 2, b = 1, stretch = "hist")
 
 ## ----message=FALSE, warning=FALSE---------------------------------------------
-# sonverting the RasterBrick to a simple list of SpatRaster
+# converting the RasterBrick to a simple list of SpatRaster
 dataset <- lapply(names(Arcachon), function(n){
   aband <- Arcachon[[n]]
   return(aband)
