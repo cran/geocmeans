@@ -2,10 +2,11 @@ Package: geocmeans
 Type: Package
 Title: Implementing Methods for Spatial Fuzzy Unsupervised
         Classification
-Version: 0.3.3
+Version: 0.3.4
 Authors@R: c(
-    person("Jeremy", "Gelb", email = "jeremy.gelb@ucs.inrs.ca",role = c("aut", "cre")),
-    person("Philippe", "Apparicio", email="philippe.apparicio@ucs.inrs.ca", role=c("ctb")))
+    person("Jeremy", "Gelb", email = "jeremy.gelb@ucs.inrs.ca",role = c("aut", "cre"), comment = c(ORCID = "0000-0002-7114-2714")),
+    person("Philippe", "Apparicio", email="philippe.apparicio@ucs.inrs.ca", role=c("ctb"), comment = c(ORCID = "0000-0001-6466-9342"))
+    )
 Maintainer: Jeremy Gelb <jeremy.gelb@ucs.inrs.ca>
 Imports: ggplot2 (>= 3.2.1), tmap (>= 3.3-1), spdep (>= 1.1.2), reldist
         (>= 1.6.6), dplyr (>= 0.8.3), fclust (>= 2.1.1), fmsb (>=
@@ -35,8 +36,8 @@ LinkingTo: Rcpp, RcppArmadillo
 SystemRequirements: C++17
 Language: en-CA
 NeedsCompilation: yes
-Packaged: 2023-02-07 00:25:31 UTC; Gelb
-Author: Jeremy Gelb [aut, cre],
-  Philippe Apparicio [ctb]
+Packaged: 2023-09-12 02:04:57 UTC; Gelb
+Author: Jeremy Gelb [aut, cre] (<https://orcid.org/0000-0002-7114-2714>),
+  Philippe Apparicio [ctb] (<https://orcid.org/0000-0001-6466-9342>)
 Repository: CRAN
-Date/Publication: 2023-02-07 01:02:31 UTC
+Date/Publication: 2023-09-12 03:10:02 UTC

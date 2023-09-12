@@ -11,6 +11,9 @@ library(viridis)
 library(spdep)
 library(tmap)
 
+spdep::set.mcOption(FALSE)
+spdep::set.coresOption(1L)
+
 data(LyonIris)
 
 # selecting the columns for the analysis
@@ -110,8 +113,6 @@ tmap_arrange(cmeansMaps$ClusterPlot,GcmeansMaps$ClusterPlot,
           nrow = 1, ncol = 2)
 
 ## ----message=FALSE, warning=FALSE---------------------------------------------
-library(spdep)
-
 Neighbours <- poly2nb(LyonIris,queen = TRUE)
 WMat <- nb2listw(Neighbours,style="W",zero.policy = TRUE)
 
@@ -150,7 +151,7 @@ SFCM <- SFCMeans(Data, WMat, k = 4, m = 1.5, alpha = 0.7,
                  verbose = FALSE, seed = 456)
 
 ## ----warning=FALSE, eval = FALSE----------------------------------------------
-#  future::plan(future::multisession(workers=4))
+#  future::plan(future::multisession(workers=2))
 #  DFindices_SFGCM <- selectParameters.mc(algo = "SGFCM", data = Data,
 #                                 k = 4, m = 1.5, alpha = seq(0,2,0.05),
 #                                 beta = seq(0,0.85,0.05),
@@ -286,10 +287,10 @@ summarizeClusters(Data,
 # equivalent to : 
 # summary(SGFCM, Data)
 
-## ----warning=FALSE, eval = FALSE----------------------------------------------
-#  spiderPlots(Data, SGFCM$Belongings,
-#              chartcolors = c("darkorange3","grey4","darkgreen","royalblue"))
-#  violinPlots(Data, SGFCM$Groups)
+## ----warning=FALSE------------------------------------------------------------
+spiderPlots(Data, SGFCM$Belongings,
+            chartcolors = c("darkorange3","grey4","darkgreen","royalblue"))
+violinPlots(Data, SGFCM$Groups)
 
 ## ----warning=FALSE, eval = FALSE----------------------------------------------
 #  bootvalues <- boot_group_validation(SGFCM, nsim = 1000, maxiter = 1000,
